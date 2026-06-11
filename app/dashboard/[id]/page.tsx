@@ -344,15 +344,20 @@ export default function FeedbackDetailPage() {
         </div>
 
         {/* Screenshot */}
-        {screenshotSrc && (
-          <div className="card" style={{ marginBottom: 20, padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ marginBottom: 20, padding: screenshotSrc ? 0 : 16, overflow: 'hidden' }}>
+          {screenshotSrc ? (
             <img
               src={screenshotSrc}
               alt="Screenshot"
               style={{ width: '100%', display: 'block', borderRadius: 12, boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}
             />
-          </div>
-        )}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>🖼️</span>
+              <span style={{ color: '#555', fontSize: 13, fontStyle: 'italic' }}>Screenshot není k dispozici</span>
+            </div>
+          )}
+        </div>
 
         {/* Comment */}
         <div className="card" style={{ marginBottom: 20 }}>
