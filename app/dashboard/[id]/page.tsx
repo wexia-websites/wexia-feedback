@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -35,6 +35,176 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'V řešení',
   resolved: 'Vyřešeno',
   dismissed: 'Zamítnuto',
+}
+
+function ElementPreview({ selector, html }: { selector: string | null; html: string | null }) {
+  const [copied, setCopied] = useState(false)
+  const [renderError, setRenderError] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  const srcdoc = html ? `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 20px;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 40px);
+    font-family: system-ui, sans-serif;
+  }
+  body > * {
+    outline: 2px solid #e02020;
+    outline-offset: 4px;
+    border-radius: 4px;
+    max-width: 100%;
+  }
+  /* reset common styles so element is visible */
+  button, input, select, textarea {
+    background: #2a2a2a;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  a { color: #e02020; }
+  p, span, div, label, h1, h2, h3, h4 { color: #fff; }
+  img { max-width: 200px; max-height: 120px; object-fit: contain; }
+</style>
+</head>
+<body>${html}</body>
+</html>` : ''
+
+  function copyHtml() {
+    if (!html) return
+    navigator.clipboard.writeText(html).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div style={{
+      background: '#1a1a1a',
+      border: '1px solid #2a2a2a',
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 20,
+    }}>
+      {/* Title */}
+      <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>
+        🎯 Označený prvek
+      </div>
+
+      {/* CSS Selector badge */}
+      {selector && (
+        <div style={{ marginBottom: 14 }}>
+          <code style={{
+            display: 'inline-block',
+            background: 'rgba(224,32,32,0.1)',
+            border: '1px solid rgba(224,32,32,0.25)',
+            borderRadius: 6,
+            padding: '4px 10px',
+            color: '#e02020',
+            fontFamily: 'monospace',
+            fontSize: 13,
+            wordBreak: 'break-all',
+          }}>
+            {selector}
+          </code>
+        </div>
+      )}
+
+      {html && (
+        <>
+          {/* HTML code block with copy button */}
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#111',
+              borderRadius: '8px 8px 0 0',
+              padding: '6px 12px',
+              borderBottom: '1px solid #2a2a2a',
+            }}>
+              <span style={{ color: '#555', fontSize: 11, fontFamily: 'monospace' }}>HTML</span>
+              <button
+                onClick={copyHtml}
+                style={{
+                  background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)',
+                  border: '1px solid',
+                  borderColor: copied ? 'rgba(34,197,94,0.3)' : '#333',
+                  color: copied ? '#22c55e' : '#888',
+                  borderRadius: 5,
+                  padding: '3px 10px',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {copied ? '✓ Zkopírováno' : 'Kopírovat'}
+              </button>
+            </div>
+            <pre style={{
+              background: '#0d0d0d',
+              border: '1px solid #2a2a2a',
+              borderTop: 'none',
+              borderRadius: '0 0 8px 8px',
+              padding: 14,
+              maxHeight: 150,
+              overflowY: 'auto',
+              overflowX: 'auto',
+              margin: 0,
+            }}>
+              <code style={{
+                fontSize: 12,
+                color: '#94a3b8',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}>
+                {html}
+              </code>
+            </pre>
+          </div>
+
+          {/* Live render in iframe */}
+          {!renderError && (
+            <div>
+              <div style={{ color: '#555', fontSize: 11, marginBottom: 6 }}>Náhled prvku</div>
+              <div style={{
+                border: '1px solid #2a2a2a',
+                borderRadius: 8,
+                overflow: 'hidden',
+                background: '#1a1a1a',
+              }}>
+                <iframe
+                  ref={iframeRef}
+                  srcDoc={srcdoc}
+                  sandbox="allow-same-origin"
+                  style={{
+                    width: '100%',
+                    height: 120,
+                    border: 'none',
+                    display: 'block',
+                  }}
+                  onError={() => setRenderError(true)}
+                  title="Element preview"
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 function formatDate(ts: string | null) {
@@ -182,32 +352,12 @@ export default function FeedbackDetailPage() {
           </div>
         </div>
 
-        {/* HTML element */}
-        {item.element_html && (
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 10 }}>
-              🖥️ HTML element
-              {item.element_selector && (
-                <span style={{ marginLeft: 8, color: '#3b82f6', fontFamily: 'monospace' }}>
-                  {item.element_selector}
-                </span>
-              )}
-            </div>
-            <pre style={{
-              background: '#0d0d0d',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: 14,
-              maxHeight: 200,
-              overflowY: 'auto',
-              overflowX: 'auto',
-              margin: 0,
-            }}>
-              <code style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {item.element_html}
-              </code>
-            </pre>
-          </div>
+        {/* Označený prvek */}
+        {(item.element_html || item.element_selector) && (
+          <ElementPreview
+            selector={item.element_selector}
+            html={item.element_html}
+          />
         )}
 
         {/* Status management */}
