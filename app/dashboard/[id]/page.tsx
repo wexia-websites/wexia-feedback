@@ -42,7 +42,10 @@ function ElementPreview({ selector, html }: { selector: string | null; html: str
   const [renderError, setRenderError] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const srcdoc = html ? `<!DOCTYPE html>
+  const hasSelector = !!selector?.trim()
+  const hasHtml = !!html?.trim()
+
+  const srcdoc = hasHtml ? `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -82,8 +85,8 @@ function ElementPreview({ selector, html }: { selector: string | null; html: str
 </html>` : ''
 
   function copyHtml() {
-    if (!html) return
-    navigator.clipboard.writeText(html).then(() => {
+    if (!hasHtml) return
+    navigator.clipboard.writeText(html!).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -102,8 +105,15 @@ function ElementPreview({ selector, html }: { selector: string | null; html: str
         🎯 Označený prvek
       </div>
 
+      {/* Fallback — nic nebylo označeno */}
+      {!hasSelector && !hasHtml && (
+        <div style={{ color: '#555', fontSize: 13, fontStyle: 'italic' }}>
+          Uživatel neoznačil žádný prvek
+        </div>
+      )}
+
       {/* CSS Selector badge */}
-      {selector && (
+      {hasSelector && (
         <div style={{ marginBottom: 14 }}>
           <code style={{
             display: 'inline-block',
@@ -121,7 +131,7 @@ function ElementPreview({ selector, html }: { selector: string | null; html: str
         </div>
       )}
 
-      {html && (
+      {hasHtml && (
         <>
           {/* HTML code block with copy button */}
           <div style={{ position: 'relative', marginBottom: 14 }}>
@@ -352,13 +362,11 @@ export default function FeedbackDetailPage() {
           </div>
         </div>
 
-        {/* Označený prvek */}
-        {(item.element_html || item.element_selector) && (
-          <ElementPreview
-            selector={item.element_selector}
-            html={item.element_html}
-          />
-        )}
+        {/* Označený prvek — vždy zobraz sekci */}
+        <ElementPreview
+          selector={item.element_selector}
+          html={item.element_html}
+        />
 
         {/* Status management */}
         <div className="card">
