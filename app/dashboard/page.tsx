@@ -1,13 +1,18 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import {
+  Icon, CatBadge, StatusPill, Avatar,
+  CATEGORIES, STATUSES, CAT_ORDER, STATUS_ORDER, CAT_ICON, STATUS_ICON,
+  fmtDate, timeAgo, deriveTitle,
+  type CategoryId, type StatusId,
+} from '@/lib/feedback-ui'
 
 type Feedback = {
   id: string
-  user_id: string | null
   user_email: string | null
   category: string | null
   comment: string | null
@@ -22,129 +27,237 @@ type Feedback = {
   status: string | null
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  bug: 'Bug',
-  feature: 'Feature',
-  design: 'Design',
-  ux: 'UX',
-  text: 'Text',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  new: 'Nový',
-  in_progress: 'V řešení',
-  resolved: 'Vyřešeno',
-  dismissed: 'Zamítnuto',
-}
-
-function formatDate(ts: string | null) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  return d.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatUrl(url: string | null) {
-  if (!url) return '—'
-  try {
-    const u = new URL(url)
-    return u.pathname + (u.search || '')
-  } catch {
-    return url
-  }
-}
-
-function FeedbackCard({ item }: { item: Feedback }) {
-  const router = useRouter()
-  const screenshotSrc = item.screenshot_url
+/* ── Thumb (real screenshot or placeholder) ── */
+function Thumb({ item, rounded = 8 }: { item: Feedback; rounded?: number }) {
+  const src = item.screenshot_url
     ? item.screenshot_url
     : item.screenshot
       ? `data:${item.screenshot_mime || 'image/png'};base64,${item.screenshot}`
       : null
 
-  return (
-    <div
-      className="card"
-      onClick={() => router.push(`/dashboard/${item.id}`)}
-      style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}
-    >
-      {/* Badges + datum */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <span className={`badge badge-${item.category || 'other'}`}>
-            {CATEGORY_LABELS[item.category || ''] || item.category || 'Ostatní'}
-          </span>
-          <span className={`status-badge status-${item.status || 'new'}`}>
-            {STATUS_LABELS[item.status || 'new'] || item.status || 'Nový'}
-          </span>
-        </div>
-        <span style={{ color: 'var(--text3)', fontSize: 12 }}>
-          {formatDate(item.timestamp)}
-        </span>
-      </div>
-
-      {/* Email */}
-      <div style={{ color: 'var(--text2)', fontSize: 13 }}>
-        <span style={{ color: 'var(--text3)' }}>◉ </span>
-        {item.user_email || '—'}
-      </div>
-
-      {/* URL */}
-      <div style={{ color: 'var(--text2)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        <span style={{ color: 'var(--text3)' }}>◌ </span>
-        {formatUrl(item.url)}
-      </div>
-
-      {/* Komentář — celý */}
+  if (src) {
+    return (
       <div style={{
-        color: 'var(--text)',
-        fontSize: 13.5,
-        lineHeight: 1.6,
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
+        width: '100%', height: '100%',
+        borderRadius: rounded,
+        overflow: 'hidden',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
       }}>
-        {item.comment || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>Bez komentáře</span>}
+        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
       </div>
+    )
+  }
 
-      {/* Screenshot thumbnail */}
-      {screenshotSrc && (
-        <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
-          <img
-            src={screenshotSrc}
-            alt="Screenshot"
-            style={{ width: '100%', display: 'block', maxHeight: 160, objectFit: 'cover', objectPosition: 'top' }}
-          />
+  const cat = (item.category || 'bug') as CategoryId
+  const hue = CATEGORIES[cat]?.hue ?? 40
+  return (
+    <div style={{
+      width: '100%', height: '100%', borderRadius: rounded,
+      background: `oklch(0.7 0.12 ${hue} / 0.10)`,
+      border: `1px solid oklch(0.7 0.12 ${hue} / 0.22)`,
+      display: 'grid', placeItems: 'center',
+    }}>
+      <Icon name={CAT_ICON[cat] || 'flag'} size={22} style={{ color: `oklch(0.74 0.13 ${hue})`, opacity: 0.5 }} />
+    </div>
+  )
+}
+
+/* ── TrendChart — 14 dní ── */
+function TrendChart({ items }: { items: Feedback[] }) {
+  const days = useMemo(() => {
+    const result: number[] = Array(14).fill(0)
+    const now = Date.now()
+    items.forEach(item => {
+      if (!item.timestamp) return
+      const diff = Math.floor((now - new Date(item.timestamp).getTime()) / 86400000)
+      if (diff >= 0 && diff < 14) result[13 - diff]++
+    })
+    return result
+  }, [items])
+
+  const max = Math.max(...days, 1)
+  const total = days.reduce((a, b) => a + b, 0)
+
+  return (
+    <div className="card" style={{ padding: '20px 22px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Příchozí reporty</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2, fontWeight: 500 }}>Posledních 14 dní</div>
         </div>
-      )}
-
-      {/* Detail odkaz */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-        <Link
-          href={`/dashboard/${item.id}`}
-          className="btn btn-outline"
-          style={{ fontSize: 12 }}
-          onClick={e => e.stopPropagation()}
-        >
-          Detail →
-        </Link>
+        <div style={{ textAlign: 'right', lineHeight: 1 }}>
+          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>{total}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginTop: 3 }}>celkem</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, height: 100 }}>
+        {days.map((v, i) => (
+          <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end' }}
+            title={`${v} reportů`}>
+            <div style={{
+              width: '100%', minHeight: 4,
+              borderRadius: '6px 6px 3px 3px',
+              background: 'linear-gradient(180deg, var(--accent-hi), var(--accent))',
+              height: `${(v / max) * 100}%`,
+              opacity: i === 13 ? 1 : 0.5,
+              transition: 'opacity 0.15s',
+            }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
+        <span>−14 d</span><span>dnes</span>
       </div>
     </div>
   )
 }
 
+/* ── CategoryBreakdown ── */
+function CategoryBreakdown({ items, onFilter }: { items: Feedback[]; onFilter: (cat: string) => void }) {
+  const counts = useMemo(() =>
+    CAT_ORDER.map(c => ({ c, n: items.filter(i => i.category === c).length })),
+    [items]
+  )
+  const max = Math.max(...counts.map(x => x.n), 1)
+
+  return (
+    <div className="card" style={{ padding: '20px 22px' }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Podle kategorie</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2, fontWeight: 500 }}>Rozdělení všech reportů</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {counts.map(({ c, n }) => {
+          const hue = CATEGORIES[c as CategoryId].hue
+          return (
+            <button
+              key={c}
+              onClick={() => onFilter(c)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 11,
+                padding: '7px 8px', borderRadius: 9, textAlign: 'left',
+                background: 'none', border: 'none', cursor: 'pointer', width: '100%',
+                fontFamily: 'inherit', transition: 'background 0.14s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              <span style={{
+                width: 26, height: 26, borderRadius: 7, display: 'grid', placeItems: 'center',
+                background: `oklch(0.7 0.12 ${hue} / 0.14)`,
+                color: `oklch(0.74 0.13 ${hue})`, flexShrink: 0,
+              }}>
+                <Icon name={CAT_ICON[c]} size={15} />
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, width: 64, flexShrink: 0, color: 'var(--text)' }}>
+                {CATEGORIES[c as CategoryId].label}
+              </span>
+              <span style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 6, overflow: 'hidden' }}>
+                <span style={{
+                  display: 'block', height: '100%', borderRadius: 6,
+                  background: `oklch(0.68 0.15 ${hue})`,
+                  width: `${(n / max) * 100}%`,
+                }} />
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', width: 24, textAlign: 'right' }}>{n}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ── ListRow ── */
+function ListRow({ item, onClick }: { item: Feedback; onClick: () => void }) {
+  const title = deriveTitle(item.comment)
+  const snippet = item.comment && item.comment.length > 150
+    ? item.comment.slice(0, 150) + '…'
+    : (item.comment || '')
+
+  return (
+    <button
+      className="list-row"
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'stretch', gap: 16, textAlign: 'left',
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
+        padding: 14, boxShadow: 'var(--shadow)', width: '100%', fontFamily: 'inherit',
+        cursor: 'pointer', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.borderColor = 'var(--border-2)'
+        e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = ''
+        e.currentTarget.style.borderColor = 'var(--border)'
+        e.currentTarget.style.boxShadow = 'var(--shadow)'
+      }}
+    >
+      {/* Thumb */}
+      <div style={{ width: 132, flexShrink: 0 }}>
+        <Thumb item={item} rounded={9} />
+      </div>
+
+      {/* Main */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <CatBadge cat={item.category || 'other'} />
+          <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+            {item.id.slice(0, 8)}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--text-2)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+            <Icon name="globe" size={12} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+            {item.url || '—'}
+          </span>
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+          {title}
+        </div>
+        {snippet && (
+          <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
+            {snippet}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)', marginTop: 'auto' }}>
+          <Avatar email={item.user_email} size={20} />
+          <span style={{ fontWeight: 500, color: 'var(--text-2)' }}>{item.user_email || '—'}</span>
+          <span>·</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <Icon name="calendar" size={12} style={{ color: 'var(--text-3)' }} />
+            {fmtDate(item.timestamp)}
+          </span>
+        </div>
+      </div>
+
+      {/* Side */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between', flexShrink: 0, padding: '2px 0' }}>
+        <StatusPill status={item.status || 'new'} />
+        <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>{timeAgo(item.timestamp)}</span>
+        <Icon name="chevronRight" size={18} style={{ color: 'var(--text-3)' }} />
+      </div>
+    </button>
+  )
+}
+
+/* ── Main page content ── */
 function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const urlStatus = searchParams.get('status') ?? ''
+  const urlStatus   = searchParams.get('status') ?? ''
   const urlCategory = searchParams.get('category') ?? ''
 
   const [items, setItems] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState(urlStatus)
-  const [filterCategory, setFilterCategory] = useState(urlCategory)
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
+  const [statusF, setStatusF] = useState(urlStatus)
+
+  const isListView = urlStatus !== '' || urlCategory !== ''
 
   useEffect(() => {
     if (sessionStorage.getItem('feedback_auth') !== 'true') {
@@ -155,8 +268,8 @@ function DashboardContent() {
   }, [])
 
   useEffect(() => {
-    setFilterStatus(urlStatus)
-    setFilterCategory(urlCategory)
+    setStatusF(urlStatus)
+    setQ('')
   }, [urlStatus, urlCategory])
 
   async function loadData() {
@@ -169,153 +282,277 @@ function DashboardContent() {
     setLoading(false)
   }
 
-  function handleStatusChange(val: string) {
-    setFilterStatus(val)
-    const sp = new URLSearchParams(searchParams.toString())
-    if (val) { sp.set('status', val) } else { sp.delete('status') }
-    router.push(`/dashboard?${sp.toString()}`)
+  function navTo(params: Record<string, string>) {
+    const sp = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v) sp.set(k, v) })
+    const q = sp.toString()
+    router.push(`/dashboard${q ? '?' + q : ''}`)
   }
 
-  function handleCategoryChange(val: string) {
-    setFilterCategory(val)
-    const sp = new URLSearchParams(searchParams.toString())
-    if (val) { sp.set('category', val) } else { sp.delete('category') }
-    router.push(`/dashboard?${sp.toString()}`)
-  }
+  // Counts for stat cards
+  const countStatus = (s: string) => items.filter(i => (i.status || 'new') === s).length
 
-  const filtered = items
-    .filter(item => {
-      if (filterCategory && item.category !== filterCategory) return false
-      if (filterStatus && item.status !== filterStatus && !(filterStatus === 'new' && !item.status)) return false
-      if (search) {
-        const q = search.toLowerCase()
-        const inComment = item.comment?.toLowerCase().includes(q) ?? false
-        const inEmail = item.user_email?.toLowerCase().includes(q) ?? false
-        if (!inComment && !inEmail) return false
-      }
-      return true
-    })
-    .sort((a, b) => {
+  // Base list (pre-filter by category/status from URL)
+  const base = useMemo(() => {
+    let list = items
+    if (urlCategory) list = list.filter(i => i.category === urlCategory)
+    return list
+  }, [items, urlCategory])
+
+  // Filtered list (search + status chip)
+  const filtered = useMemo(() => {
+    let list = base
+    if (statusF) list = list.filter(i => (i.status || 'new') === statusF)
+    if (q.trim()) {
+      const t = q.toLowerCase()
+      list = list.filter(i =>
+        (i.comment || '').toLowerCase().includes(t) ||
+        (i.user_email || '').toLowerCase().includes(t) ||
+        (i.url || '').toLowerCase().includes(t)
+      )
+    }
+    return [...list].sort((a, b) => {
       const ta = new Date(a.timestamp || 0).getTime()
       const tb = new Date(b.timestamp || 0).getTime()
-      return sortOrder === 'desc' ? tb - ta : ta - tb
+      return sort === 'newest' ? tb - ta : ta - tb
     })
+  }, [base, statusF, q, sort])
 
-  const total = items.length
-  const bugs = items.filter(i => i.category === 'bug').length
-  const features = items.filter(i => i.category === 'feature').length
-  const design = items.filter(i => i.category === 'design').length
-  const newCount = items.filter(i => !i.status || i.status === 'new').length
+  // Heading for list view
+  let heading = 'Všechny reporty'
+  let sub = 'Kompletní zpětná vazba'
+  if (urlStatus && STATUSES[urlStatus as StatusId]) {
+    heading = STATUSES[urlStatus as StatusId].label
+    sub = `Reporty se stavem „${STATUSES[urlStatus as StatusId].label.toLowerCase()}"`
+  }
+  if (urlCategory && CATEGORIES[urlCategory as CategoryId]) {
+    heading = CATEGORIES[urlCategory as CategoryId].label
+    sub = CATEGORIES[urlCategory as CategoryId].desc
+  }
+
+  if (loading) return (
+    <div className="empty" style={{ marginTop: 80 }}><span>Načítám...</span></div>
+  )
+
+  /* ── DASHBOARD VIEW ── */
+  if (!isListView) return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1>Přehled</h1>
+          <p>Zpětná vazba z AI Laboratoře — co přišlo a kde to vázne.</p>
+        </div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          color: 'var(--text-2)', padding: '7px 13px', borderRadius: 10,
+          fontSize: 13, fontWeight: 700,
+        }}>
+          <Icon name="layers" size={15} style={{ color: 'var(--text-3)' }} />
+          {items.length} reportů
+        </div>
+      </div>
+
+      <div className="page-body">
+        {/* Stat karty */}
+        <div className="stat-grid">
+          {STATUS_ORDER.map(s => {
+            const st = STATUSES[s]
+            return (
+              <button
+                key={s}
+                onClick={() => navTo({ status: s })}
+                className="stat-card"
+                style={st.muted ? {} : ({ '--h': st.hue } as React.CSSProperties)}
+              >
+                <div className="stat-top">
+                  <span className="stat-label">{st.label}</span>
+                  <span style={{
+                    width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center',
+                    background: st.muted ? 'var(--surface-2)' : `oklch(0.7 0.12 ${st.hue} / 0.14)`,
+                    color: st.muted ? 'var(--text-3)' : `oklch(0.74 0.13 ${st.hue})`,
+                  }}>
+                    <Icon name={STATUS_ICON[s]} size={16} />
+                  </span>
+                </div>
+                <div className="stat-value">{countStatus(s)}</div>
+                <div className="stat-sub">
+                  {s === 'new' ? 'čeká na zpracování'
+                    : s === 'in_progress' ? 'právě opravujeme'
+                    : s === 'resolved' ? 'hotovo'
+                    : 'nebudeme řešit'}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Graf + breakdown */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: 16, marginBottom: 18 }}>
+          <TrendChart items={items} />
+          <CategoryBreakdown items={items} onFilter={cat => navTo({ category: cat })} />
+        </div>
+
+        {/* Nejnovější */}
+        <div className="card" style={{ padding: '20px 22px 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Nejnovější reporty</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2, fontWeight: 500 }}>Poslední příchozí zpětná vazba</div>
+            </div>
+            <button
+              onClick={() => navTo({ status: '' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--accent-hi)', fontSize: 13, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '4px 2px' }}
+            >
+              Zobrazit vše <Icon name="arrowUpRight" size={14} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {[...items].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()).slice(0, 5).map(item => {
+              const cat = (item.category || 'bug') as CategoryId
+              const hue = CATEGORIES[cat]?.hue ?? 40
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => router.push(`/dashboard/${item.id}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 13, padding: '12px 8px',
+                    borderRadius: 10, textAlign: 'left', background: 'none', border: 'none',
+                    cursor: 'pointer', fontFamily: 'inherit', width: '100%',
+                    borderBottom: '1px solid var(--border)', transition: 'background 0.14s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ width: 32, height: 32, borderRadius: 9, display: 'grid', placeItems: 'center', background: `oklch(0.7 0.12 ${hue} / 0.14)`, color: `oklch(0.74 0.13 ${hue})`, flexShrink: 0 }}>
+                    <Icon name={CAT_ICON[cat] || 'flag'} size={15} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+                      {deriveTitle(item.comment)}
+                    </span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}>{item.url || '—'}</span> · {timeAgo(item.timestamp)}
+                    </span>
+                  </span>
+                  <StatusPill status={item.status || 'new'} />
+                  <Icon name="chevronRight" size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  /* ── LIST VIEW ── */
+  const statusChips: Array<StatusId | 'all'> = ['all', ...STATUS_ORDER]
 
   return (
     <>
       <div className="page-header">
         <div>
-          <h1>Feedback</h1>
-          <p>Přehled zpětné vazby z AI Laboratoře</p>
+          <h1>{heading}</h1>
+          <p>{sub}</p>
+        </div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          color: 'var(--text-2)', padding: '7px 13px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+        }}>
+          <Icon name="layers" size={15} style={{ color: 'var(--text-3)' }} />
+          {filtered.length} z {base.length}
         </div>
       </div>
 
       <div className="page-body">
-        {/* Stat kartičky */}
-        <div className="stats-row">
-          <div className="stat-card">
-            <div className="stat-label">Celkem</div>
-            <div className="stat-value">{total}</div>
-            <div className="stat-sub">všechny záznamy</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Bugy</div>
-            <div className="stat-value" style={{ color: '#ef4444' }}>{bugs}</div>
-            <div className="stat-sub">nahlášené chyby</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Featury</div>
-            <div className="stat-value" style={{ color: '#3b82f6' }}>{features}</div>
-            <div className="stat-sub">návrhy funkcí</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Design</div>
-            <div className="stat-value" style={{ color: '#a855f7' }}>{design}</div>
-            <div className="stat-sub">designové podněty</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Nové</div>
-            <div className="stat-value" style={{ color: '#f59e0b' }}>{newCount}</div>
-            <div className="stat-sub">čeká na zpracování</div>
-          </div>
-        </div>
-
-        {/* Filtry */}
-        <div className="filters-row">
-          <input
-            className="form-input"
-            placeholder="Hledat v komentáři nebo emailu..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select
-            className="form-select"
-            value={filterCategory}
-            onChange={e => handleCategoryChange(e.target.value)}
-            style={{ width: 'auto' }}
-          >
-            <option value="">Všechny kategorie</option>
-            <option value="bug">Bug</option>
-            <option value="feature">Feature</option>
-            <option value="design">Design</option>
-            <option value="ux">UX</option>
-            <option value="text">Text</option>
-          </select>
-          <select
-            className="form-select"
-            value={filterStatus}
-            onChange={e => handleStatusChange(e.target.value)}
-            style={{ width: 'auto' }}
-          >
-            <option value="">Všechny statusy</option>
-            <option value="new">Nový</option>
-            <option value="in_progress">V řešení</option>
-            <option value="resolved">Vyřešeno</option>
-            <option value="dismissed">Zamítnuto</option>
-          </select>
-          <select
-            className="form-select"
-            value={sortOrder}
-            onChange={e => setSortOrder(e.target.value as 'desc' | 'asc')}
-            style={{ width: 'auto' }}
-          >
-            <option value="desc">Nejnovější</option>
-            <option value="asc">Nejstarší</option>
-          </select>
-        </div>
-
-        {/* Počet výsledků */}
-        <div style={{ color: 'var(--text3)', fontSize: 12, marginBottom: 16 }}>
-          {loading ? 'Načítám...' : `${filtered.length} z ${total} feedbacků`}
-        </div>
-
-        {/* Seznam */}
-        {loading ? (
-          <div className="empty">
-            <span>Načítám feedbacky...</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">
-            <span style={{ fontSize: 28 }}>◌</span>
-            <span>Žádné feedbacky nenalezeny</span>
-          </div>
-        ) : (
+        {/* Toolbar */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))',
-            gap: 16,
+            flex: 1, display: 'flex', alignItems: 'center', gap: 10,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 11, padding: '0 14px', transition: 'border-color 0.14s, box-shadow 0.14s',
+          }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+          >
+            <Icon name="search" size={17} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Hledat v komentáři, e-mailu nebo URL…"
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14, fontWeight: 500, padding: '12px 0', fontFamily: 'inherit' }}
+            />
+            {q && (
+              <button onClick={() => setQ('')} style={{ color: 'var(--text-3)', display: 'grid', placeItems: 'center', padding: 4, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer' }}>
+                <Icon name="x" size={14} />
+              </button>
+            )}
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 11, padding: '0 12px', position: 'relative',
           }}>
-            {filtered.map(item => (
-              <FeedbackCard key={item.id} item={item} />
-            ))}
+            <Icon name="trend" size={15} style={{ color: 'var(--text-3)' }} />
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as 'newest' | 'oldest')}
+              style={{ appearance: 'none', background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, padding: '12px 22px 12px 0', cursor: 'pointer' }}
+            >
+              <option value="newest">Nejnovější</option>
+              <option value="oldest">Nejstarší</option>
+            </select>
+            <Icon name="chevronDown" size={14} style={{ color: 'var(--text-3)', position: 'absolute', right: 11, pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+        {/* Status chips — skryj pokud filtrujeme podle statusu z URL */}
+        {!urlStatus && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+            {statusChips.map(s => {
+              const active = statusF === s || (s === 'all' && !statusF)
+              const st = s !== 'all' ? STATUSES[s as StatusId] : null
+              const hue = st && !st.muted ? st.hue : null
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusF(s === 'all' ? '' : s)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '7px 13px', borderRadius: 20, fontSize: 13, fontWeight: 700,
+                    color: active ? 'var(--bg)' : 'var(--text-2)',
+                    background: active ? 'var(--text)' : 'var(--surface)',
+                    border: `1px solid ${active ? 'var(--text)' : 'var(--border)'}`,
+                    transition: 'all 0.14s', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  {hue != null && (
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: `oklch(0.7 0.16 ${hue})`, flexShrink: 0 }} />
+                  )}
+                  {s === 'all' ? 'Vše' : STATUSES[s as StatusId].label}
+                  <span style={{ fontSize: 11.5, opacity: active ? 0.6 : 1 }}>
+                    {s === 'all' ? base.length : base.filter(i => (i.status || 'new') === s).length}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
+
+        {/* List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          {filtered.length === 0 ? (
+            <div className="empty">
+              <Icon name="inbox" size={28} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-2)' }}>Nic tu není</div>
+              <p>Zkus změnit filtr nebo hledaný výraz.</p>
+            </div>
+          ) : filtered.map(item => (
+            <ListRow key={item.id} item={item} onClick={() => router.push(`/dashboard/${item.id}`)} />
+          ))}
+        </div>
       </div>
     </>
   )
@@ -323,11 +560,7 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={
-      <div className="empty" style={{ marginTop: 100 }}>
-        <span>Načítám...</span>
-      </div>
-    }>
+    <Suspense fallback={<div className="empty" style={{ marginTop: 80 }}><span>Načítám...</span></div>}>
       <DashboardContent />
     </Suspense>
   )

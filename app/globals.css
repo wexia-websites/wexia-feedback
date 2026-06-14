@@ -463,6 +463,21 @@ body {
   font-weight: 500;
 }
 
+/* ── STAT GRID ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
 /* ── FORMS ── */
 .form-input,
 .form-textarea,
