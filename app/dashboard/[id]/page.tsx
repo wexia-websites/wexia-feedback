@@ -45,12 +45,17 @@ function formatDate(ts: string | null) {
 }
 
 function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  // zoom = 1 odpovídá nativní velikosti obrázku (naturalWidth × naturalHeight)
+  // fitZoom = počáteční zoom aby se obrázek vešel do viewportu
   const [zoom, setZoom] = useState(1)
+  const [fitZoom, setFitZoom] = useState(1)
+  const [imageLoaded, setImageLoaded] = useState(false)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragging = useRef(false)
   const lastPos = useRef({ x: 0, y: 0 })
   const overlayRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
 
   // Esc + scroll lock
   useEffect(() => {
@@ -63,20 +68,20 @@ function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void
     }
   }, [onClose])
 
-  // Wheel zoom — musí být non-passive aby šlo preventDefault
+  // Wheel zoom — non-passive aby šlo preventDefault
   useEffect(() => {
     const el = overlayRef.current
     if (!el) return
     function onWheel(e: WheelEvent) {
       e.preventDefault()
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-      setZoom(z => Math.min(10, Math.max(0.2, z * factor)))
+      setZoom(z => Math.min(10, Math.max(0.05, z * factor)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // Drag — mousemove/mouseup na window, aby fungovalo i mimo obrázek
+  // Drag — na window aby fungovalo i mimo obrázek
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!dragging.current) return
@@ -89,12 +94,40 @@ function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [])
 
+  // Načtení obrazku — zjistí nativní rozměry a spočítá fit zoom
+  function handleLoad(img: HTMLImageElement) {
+    const nw = img.naturalWidth
+    const nh = img.naturalHeight
+    if (!nw || !nh) return
+    const vw = window.innerWidth * 0.9
+    const vh = window.innerHeight * 0.9
+    // Pokud se obrázek vejde nativně, zobraz v 100 %; jinak zmenš aby se vešel
+    const calculated = Math.min(1, Math.min(vw / nw, vh / nh))
+    setFitZoom(calculated)
+    setZoom(calculated)
+    setImageLoaded(true)
+  }
+
+  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    handleLoad(e.currentTarget)
+  }
+
+  // Pokud je obrázek z cache, onLoad se nemusí spustit — zkontroluj na mount
+  useEffect(() => {
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth > 0) handleLoad(img)
+  }, [])
+
   function onMouseDown(e: React.MouseEvent) {
     e.preventDefault()
     dragging.current = true
     setIsDragging(true)
     lastPos.current = { x: e.clientX, y: e.clientY }
   }
+
+  // image-rendering: pixelated zachová ostrost při zoom > 1 (přiblížení nad nativní rozlišení)
+  // při zoom <= 1 je auto plynulejší (zmenšování)
+  const imgRendering: React.CSSProperties['imageRendering'] = zoom > 1 ? 'pixelated' : 'auto'
 
   const btnStyle: React.CSSProperties = {
     width: 36, height: 36,
@@ -127,7 +160,7 @@ function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void
         justifyContent: 'center',
       }}
     >
-      {/* Obrázek */}
+      {/* Obrázek — BEZ CSS width/height/max-width/max-height, scale pouze přes transform */}
       <div
         onClick={e => e.stopPropagation()}
         onMouseDown={onMouseDown}
@@ -137,56 +170,66 @@ function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void
           cursor: isDragging ? 'grabbing' : 'grab',
           userSelect: 'none',
           willChange: 'transform',
+          // skryj dokud neznáme nativní rozměry (aby nebliklo velké)
+          visibility: imageLoaded ? 'visible' : 'hidden',
         }}
       >
         <img
+          ref={imgRef}
           src={src}
           alt="Screenshot"
           draggable={false}
+          onLoad={onImgLoad}
           style={{
             display: 'block',
-            maxWidth: '88vw',
-            maxHeight: '88vh',
-            imageRendering: 'auto',
+            // záměrně žádné width / height / max-width / max-height —
+            // obrázek renderuje v naturalWidth × naturalHeight, scale dělá transform výše
+            imageRendering: imgRendering,
             borderRadius: 4,
           }}
         />
       </div>
 
+      {/* Načítání */}
+      {!imageLoaded && (
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, pointerEvents: 'none' }}>
+          Načítám...
+        </div>
+      )}
+
       {/* Ovládací tlačítka */}
       <div
         onClick={e => e.stopPropagation()}
-        style={{
-          position: 'fixed', top: 16, right: 16,
-          display: 'flex', gap: 8, zIndex: 1001,
-          alignItems: 'center',
-        }}
+        style={{ position: 'fixed', top: 16, right: 16, display: 'flex', gap: 8, zIndex: 1001, alignItems: 'center' }}
       >
         <button
-          style={btnStyle}
-          title="Přiblížit"
+          style={btnStyle} title="Přiblížit"
           onClick={() => setZoom(z => Math.min(10, z * 1.2))}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
         >+</button>
         <button
-          style={btnStyle}
-          title="Oddálit"
-          onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}
+          style={btnStyle} title="Oddálit"
+          onClick={() => setZoom(z => Math.max(0.05, z / 1.2))}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
         >−</button>
+        <button
+          style={{ ...btnStyle, fontSize: 11 }} title="Resetovat zoom"
+          onClick={() => { setZoom(fitZoom); setOffset({ x: 0, y: 0 }) }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
+        >⊡</button>
         <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.15)' }} />
         <button
-          style={{ ...btnStyle, color: '#e02020', borderColor: 'rgba(224,32,32,0.3)' }}
-          title="Zavřít (Esc)"
+          style={{ ...btnStyle, color: '#e02020', borderColor: 'rgba(224,32,32,0.3)' }} title="Zavřít (Esc)"
           onClick={onClose}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,32,32,0.15)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
         >✕</button>
       </div>
 
-      {/* Zoom level */}
+      {/* Zoom indikátor */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
