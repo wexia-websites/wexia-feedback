@@ -173,17 +173,34 @@ function DashboardContent() {
   const [sort, setSort]       = useState<'newest' | 'oldest'>('newest')
   const [statusF, setStatusF] = useState(urlStatus)
   const [sourceApp, setSourceApp] = useState('')
+  const [userEmail, setUserEmail] = useState('')
 
   // Sync status chip with URL
   const prevUrlStatus = urlStatus
   if (statusF !== prevUrlStatus && !q) setStatusF(urlStatus)
 
-  // Distinct source_app values from all reports
+  // Distinct source_app values
   const sourceApps = useMemo(() => {
     const vals = new Set<string>()
     reports.forEach(r => { if (r.source_app) vals.add(r.source_app) })
     return Array.from(vals).sort()
   }, [reports])
+
+  // Distinct user_email values (pro user dropdown)
+  const userEmails = useMemo(() => {
+    const vals = new Set<string>()
+    reports.forEach(r => { if (r.user_email) vals.add(r.user_email) })
+    return Array.from(vals).sort()
+  }, [reports])
+
+  function resetLocalFilters() {
+    setQ('')
+    setSourceApp('')
+    setUserEmail('')
+    setStatusF('')
+  }
+
+  const hasLocalFilters = q.trim() !== '' || sourceApp !== '' || userEmail !== '' || statusF !== ''
 
   const countStatus = (s: string) => reports.filter(r => (r.status || 'new') === s).length
 
@@ -201,8 +218,10 @@ function DashboardContent() {
 
   const filtered = useMemo(() => {
     let list = base
-    if (statusF)   list = list.filter(i => (i.status || 'new') === statusF)
-    if (sourceApp) list = list.filter(i => (i.source_app || 'AI Laboratoř') === sourceApp)
+    // AND logika — průnik všech aktivních filtrů
+    if (statusF)    list = list.filter(i => (i.status || 'new') === statusF)
+    if (sourceApp)  list = list.filter(i => (i.source_app || 'AI Laboratoř') === sourceApp)
+    if (userEmail)  list = list.filter(i => i.user_email === userEmail)
     if (q.trim()) {
       const t = q.toLowerCase()
       list = list.filter(i =>
@@ -216,7 +235,7 @@ function DashboardContent() {
       const tb = new Date(b.timestamp || 0).getTime()
       return sort === 'newest' ? tb - ta : ta - tb
     })
-  }, [base, statusF, sourceApp, q, sort])
+  }, [base, statusF, sourceApp, userEmail, q, sort])
 
   let heading = 'Všechny reporty', sub = 'Kompletní zpětná vazba'
   if (urlStatus && STATUSES[urlStatus as StatusId]) {
@@ -337,6 +356,27 @@ function DashboardContent() {
             ]}
           />
           <Dropdown
+            value={userEmail}
+            onChange={setUserEmail}
+            prefixIcon="mail"
+            minWidth={160}
+            searchable
+            searchPlaceholder="Hledat uživatele..."
+            options={[
+              { value: '', label: 'Všichni' },
+              ...userEmails.map(email => ({
+                value: email,
+                label: email,
+                renderItem: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <Avatar email={email} size={20} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
+                  </span>
+                ),
+              })),
+            ]}
+          />
+          <Dropdown
             value={sort}
             onChange={v => setSort(v as 'newest' | 'oldest')}
             prefixIcon="trend"
@@ -371,9 +411,16 @@ function DashboardContent() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           {filtered.length === 0 ? (
             <div className="empty">
-              <Icon name="inbox" size={28} />
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-2)' }}>Nic tu není</div>
-              <p>Zkus změnit filtr nebo hledaný výraz.</p>
+              <Icon name="filter" size={28} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-2)' }}>Žádné reporty neodpovídají filtru</div>
+              <p>Zkus upravit nebo zrušit aktivní filtry.</p>
+              {hasLocalFilters && (
+                <button onClick={resetLocalFilters}
+                  className="btn btn-outline"
+                  style={{ marginTop: 12 }}>
+                  Zrušit filtry
+                </button>
+              )}
             </div>
           ) : filtered.map(item => (
             <ListRow key={item.id} item={item} onClick={() => router.push(`/dashboard/${item.id}`)} />
