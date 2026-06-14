@@ -255,7 +255,6 @@ function DashboardContent() {
       <div className="page-header">
         <div>
           <h1>Přehled</h1>
-          <p>Zpětná vazba z AI Laboratoře — co přišlo a kde to vázne.</p>
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '7px 13px', borderRadius: 10, fontSize: 13, fontWeight: 700 }}>
           <Icon name="layers" size={15} style={{ color: 'var(--text-3)' }} />
