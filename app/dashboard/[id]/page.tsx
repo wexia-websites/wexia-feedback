@@ -44,6 +44,170 @@ function formatDate(ts: string | null) {
     + ' ' + d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
 }
 
+function ScreenshotLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragging = useRef(false)
+  const lastPos = useRef({ x: 0, y: 0 })
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  // Esc + scroll lock
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
+
+  // Wheel zoom — musí být non-passive aby šlo preventDefault
+  useEffect(() => {
+    const el = overlayRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+      setZoom(z => Math.min(10, Math.max(0.2, z * factor)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  // Drag — mousemove/mouseup na window, aby fungovalo i mimo obrázek
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragging.current) return
+      setOffset(o => ({ x: o.x + e.clientX - lastPos.current.x, y: o.y + e.clientY - lastPos.current.y }))
+      lastPos.current = { x: e.clientX, y: e.clientY }
+    }
+    function onUp() { dragging.current = false; setIsDragging(false) }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [])
+
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    dragging.current = true
+    setIsDragging(true)
+    lastPos.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const btnStyle: React.CSSProperties = {
+    width: 36, height: 36,
+    border: '1px solid rgba(255,255,255,0.18)',
+    background: 'rgba(20,20,20,0.85)',
+    backdropFilter: 'blur(8px)',
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 18,
+    lineHeight: 1,
+    cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontFamily: 'inherit',
+    transition: 'background 0.12s',
+    flexShrink: 0,
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.92)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {/* Obrázek */}
+      <div
+        onClick={e => e.stopPropagation()}
+        onMouseDown={onMouseDown}
+        style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+          transformOrigin: 'center center',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          willChange: 'transform',
+        }}
+      >
+        <img
+          src={src}
+          alt="Screenshot"
+          draggable={false}
+          style={{
+            display: 'block',
+            maxWidth: '88vw',
+            maxHeight: '88vh',
+            imageRendering: 'auto',
+            borderRadius: 4,
+          }}
+        />
+      </div>
+
+      {/* Ovládací tlačítka */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'fixed', top: 16, right: 16,
+          display: 'flex', gap: 8, zIndex: 1001,
+          alignItems: 'center',
+        }}
+      >
+        <button
+          style={btnStyle}
+          title="Přiblížit"
+          onClick={() => setZoom(z => Math.min(10, z * 1.2))}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
+        >+</button>
+        <button
+          style={btnStyle}
+          title="Oddálit"
+          onClick={() => setZoom(z => Math.max(0.2, z / 1.2))}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
+        >−</button>
+        <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.15)' }} />
+        <button
+          style={{ ...btnStyle, color: '#e02020', borderColor: 'rgba(224,32,32,0.3)' }}
+          title="Zavřít (Esc)"
+          onClick={onClose}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,32,32,0.15)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(20,20,20,0.85)')}
+        >✕</button>
+      </div>
+
+      {/* Zoom level */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'fixed', bottom: 16, right: 16,
+          background: 'rgba(20,20,20,0.85)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 6,
+          padding: '4px 10px',
+          color: 'rgba(255,255,255,0.5)',
+          fontSize: 12,
+          fontFamily: 'monospace',
+          zIndex: 1001,
+        }}
+      >
+        {Math.round(zoom * 100)} %
+      </div>
+    </div>
+  )
+}
+
 function ElementPreview({ selector, html }: { selector: string | null; html: string | null }) {
   const [copied, setCopied] = useState(false)
   const [renderError, setRenderError] = useState(false)
@@ -184,6 +348,7 @@ export default function FeedbackDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     if (sessionStorage.getItem('feedback_auth') !== 'true') {
@@ -297,7 +462,9 @@ export default function FeedbackDetailPage() {
             <img
               src={screenshotSrc}
               alt="Screenshot"
-              style={{ width: '100%', display: 'block', borderRadius: 'var(--r)' }}
+              onClick={() => setLightboxOpen(true)}
+              title="Klikni pro zvětšení"
+              style={{ width: '100%', display: 'block', borderRadius: 'var(--r)', cursor: 'pointer' }}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -306,6 +473,11 @@ export default function FeedbackDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Lightbox */}
+        {lightboxOpen && screenshotSrc && (
+          <ScreenshotLightbox src={screenshotSrc} onClose={() => setLightboxOpen(false)} />
+        )}
 
         {/* Komentář */}
         <div className="card" style={{ marginBottom: 16 }}>
