@@ -297,7 +297,9 @@ export default function FeedbackDetailPage() {
             <img
               src={screenshotSrc}
               alt="Screenshot"
-              style={{ width: '100%', display: 'block', borderRadius: 'var(--r)' }}
+              title="Otevřít v plné velikosti"
+              onClick={() => window.open(screenshotSrc, '_blank')}
+              style={{ width: '100%', display: 'block', borderRadius: 'var(--r)', cursor: 'pointer' }}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
