@@ -93,6 +93,7 @@ export default function FeedbackDetailPage() {
   const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [checkingEmails, setCheckingEmails] = useState(false)
   const [checkResult, setCheckResult] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'status' | 'emails' | 'notes'>('status')
 
   // Report z kontextu — žádný vlastní fetch
   const item = reports.find(r => r.id === id) ?? null
@@ -291,176 +292,203 @@ export default function FeedbackDetailPage() {
         </div>
 
         {/* ── Side column ── */}
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 20 }}>
+        <aside style={{ position: 'sticky', top: 20 }}>
 
-          {/* Změna stavu */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Změnit stav</div>
-            {successMsg && <div className="success-banner" style={{ marginBottom: 10 }}>✓ {successMsg}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {STATUS_ORDER.map(s => {
-                const st = STATUSES[s]
-                const isOn = (item.status || 'new') === s
-                return (
-                  <button key={s} onClick={() => handleUpdateStatus(s)} disabled={updating || isOn}
-                    style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 11px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: isOn ? 'default' : 'pointer', color: isOn ? (st.muted ? 'var(--text)' : `oklch(0.86 0.11 ${st.hue})`) : 'var(--text-2)', background: isOn ? (st.muted ? 'var(--surface-hi)' : `oklch(0.7 0.13 ${st.hue} / 0.14)`) : 'var(--surface-2)', border: isOn ? (st.muted ? '1px solid var(--border-2)' : `1px solid oklch(0.7 0.13 ${st.hue} / 0.4)`) : '1px solid transparent', transition: 'all 0.14s', opacity: updating ? 0.6 : 1 }}
-                    onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = 'var(--surface-hi)' }}
-                    onMouseLeave={e => { if (!isOn) e.currentTarget.style.background = 'var(--surface-2)' }}>
-                    <Icon name={STATUS_ICON[s]} size={15} />
-                    {st.label}
-                    {isOn && <Icon name="check" size={14} style={{ marginLeft: 'auto' }} />}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Vlastnosti */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Vlastnosti</div>
-            <div style={{ borderBottom: '1px solid var(--border)', padding: '9px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Kategorie</span>
-              <CatBadge cat={item.category || 'other'} size="sm" />
-            </div>
-            <div style={{ padding: '9px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>ID reportu</span>
-              <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-2)' }}>{item.id.slice(0, 8)}</span>
-            </div>
-          </div>
-
-          {/* Interní poznámky */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Interní poznámky</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: notes.length > 0 ? 13 : 0 }}>
-              {notes.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', paddingBottom: 4 }}>Zatím žádné poznámky.</div>}
-              {notes.map((n, i) => (
-                <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 11, padding: '11px 13px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
-                    <Avatar email={n.author} size={20} />
-                    <strong style={{ fontWeight: 700 }}>{n.author}</strong>
-                    <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500 }}>{timeAgo(n.at)}</span>
-                  </div>
-                  <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{n.text}</p>
-                </div>
-              ))}
-            </div>
-            <div>
-              <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
-                placeholder="Přidat poznámku… (Ctrl+Enter)"
-                style={{ width: '100%', minHeight: 64, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
-                onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }} />
-              <button onClick={handleAddNote} disabled={!noteDraft.trim() || addingNote}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !noteDraft.trim() || addingNote ? 0.45 : 1 }}
-                onMouseEnter={e => { if (noteDraft.trim()) e.currentTarget.style.background = 'var(--accent-hi)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}>
-                <Icon name="plus" size={15} />
-                {addingNote ? 'Ukládám…' : 'Přidat poznámku'}
-              </button>
-            </div>
-          </div>
-          {/* E-maily */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-maily</div>
+          {/* Tab bar */}
+          <div style={{
+            display: 'flex', gap: 2,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 4, marginBottom: 12, boxShadow: 'var(--shadow)',
+          }}>
+            {([
+              { id: 'status', label: 'Stav' },
+              { id: 'emails', label: 'E-maily' },
+              { id: 'notes',  label: 'Poznámky' },
+            ] as const).map(tab => (
               <button
-                onClick={handleCheckEmails}
-                disabled={checkingEmails}
-                title="Zkontrolovat nové e-maily"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
-                onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  flex: 1, padding: '7px 10px', borderRadius: 9,
+                  fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                  border: 'none', cursor: 'pointer', transition: 'background 0.14s, color 0.14s',
+                  background: activeTab === tab.id ? 'var(--accent)' : 'none',
+                  color: activeTab === tab.id ? '#fff' : 'var(--text-2)',
+                }}
               >
-                <Icon name="trend" size={13} style={{ transform: checkingEmails ? 'none' : undefined }} />
-                {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
+                {tab.label}
               </button>
-            </div>
-
-            {checkResult && (
-              <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', marginBottom: 10, fontStyle: 'italic' }}>
-                {checkResult}
-              </div>
-            )}
-
-            {emailNotes.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím žádné e-maily.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {emailNotes.map((n, i) => {
-                  const isSent = n.text.startsWith(SENT_PREFIX)
-                  const text   = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
-                  return (
-                    <div key={i} style={{
-                      background: isSent ? 'var(--surface-2)' : 'oklch(0.7 0.12 150 / 0.08)',
-                      border: isSent ? '1px solid var(--border)' : '1px solid oklch(0.7 0.12 150 / 0.2)',
-                      borderRadius: 11, padding: '11px 13px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
-                        <span style={{
-                          width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0,
-                          background: isSent ? 'var(--accent-soft)' : 'oklch(0.7 0.12 150 / 0.15)',
-                          border: isSent ? '1px solid var(--accent-line)' : '1px solid oklch(0.7 0.12 150 / 0.3)',
-                        }}>
-                          <Icon name="mail" size={11} style={{ color: isSent ? 'var(--accent-hi)' : 'oklch(0.74 0.14 150)' }} />
-                        </span>
-                        <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>
-                          {isSent ? 'Odpověď odeslána uživateli' : 'Odpověď od uživatele'}
-                        </span>
-                        <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
-                      </div>
-                      <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{text}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            ))}
           </div>
 
-          {/* Odpovědět uživateli */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>
-              Odpovědět uživateli
-            </div>
+          {/* TAB: Stav */}
+          {activeTab === 'status' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {item.user_email ? (
-              <>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon name="mail" size={13} />
-                  {item.user_email}
+              {/* Změnit stav */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Změnit stav</div>
+                {successMsg && <div className="success-banner" style={{ marginBottom: 10 }}>✓ {successMsg}</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {STATUS_ORDER.map(s => {
+                    const st = STATUSES[s]
+                    const isOn = (item.status || 'new') === s
+                    return (
+                      <button key={s} onClick={() => handleUpdateStatus(s)} disabled={updating || isOn}
+                        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 11px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: isOn ? 'default' : 'pointer', color: isOn ? (st.muted ? 'var(--text)' : `oklch(0.86 0.11 ${st.hue})`) : 'var(--text-2)', background: isOn ? (st.muted ? 'var(--surface-hi)' : `oklch(0.7 0.13 ${st.hue} / 0.14)`) : 'var(--surface-2)', border: isOn ? (st.muted ? '1px solid var(--border-2)' : `1px solid oklch(0.7 0.13 ${st.hue} / 0.4)`) : '1px solid transparent', transition: 'all 0.14s', opacity: updating ? 0.6 : 1 }}
+                        onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = 'var(--surface-hi)' }}
+                        onMouseLeave={e => { if (!isOn) e.currentTarget.style.background = 'var(--surface-2)' }}>
+                        <Icon name={STATUS_ICON[s]} size={15} />
+                        {st.label}
+                        {isOn && <Icon name="check" size={14} style={{ marginLeft: 'auto' }} />}
+                      </button>
+                    )
+                  })}
                 </div>
+              </div>
 
-                {replyResult && (
-                  <div className={replyResult.ok ? 'success-banner' : 'error-banner'} style={{ marginBottom: 10 }}>
-                    {replyResult.ok ? `✓ ${replyResult.msg}` : `✕ ${replyResult.msg}`}
+              {/* Vlastnosti */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Vlastnosti</div>
+                <div style={{ borderBottom: '1px solid var(--border)', padding: '9px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Kategorie</span>
+                  <CatBadge cat={item.category || 'other'} size="sm" />
+                </div>
+                {item.source_app && (
+                  <div style={{ borderBottom: '1px solid var(--border)', padding: '9px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Zdroj</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{item.source_app}</span>
                   </div>
                 )}
-
-                <textarea
-                  value={replyDraft}
-                  onChange={e => { setReplyDraft(e.target.value); setReplyResult(null) }}
-                  placeholder="Napiš odpověď uživateli…"
-                  style={{ width: '100%', minHeight: 80, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
-                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
-                />
-                <button
-                  onClick={handleSendReply}
-                  disabled={!replyDraft.trim() || sendingReply}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !replyDraft.trim() || sendingReply ? 0.45 : 1 }}
-                  onMouseEnter={e => { if (replyDraft.trim() && !sendingReply) e.currentTarget.style.background = 'var(--accent-hi)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}
-                >
-                  <Icon name="mail" size={15} />
-                  {sendingReply ? 'Odesílám…' : 'Odeslat e-mail'}
-                </button>
-              </>
-            ) : (
-              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                Feedback neobsahuje e-mail uživatele.
+                <div style={{ padding: '9px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>ID reportu</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-2)' }}>{item.id.slice(0, 8)}</span>
+                </div>
               </div>
-            )}
-          </div>
+
+            </div>
+          )}
+
+          {/* TAB: E-maily */}
+          {activeTab === 'emails' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* Historie e-mailů */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-maily</div>
+                  <button
+                    onClick={handleCheckEmails}
+                    disabled={checkingEmails}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
+                    onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                  >
+                    <Icon name="trend" size={13} />
+                    {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
+                  </button>
+                </div>
+                {checkResult && (
+                  <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', marginBottom: 10, fontStyle: 'italic' }}>
+                    {checkResult}
+                  </div>
+                )}
+                {emailNotes.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím žádné e-maily.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {emailNotes.map((n, i) => {
+                      const isSent = n.text.startsWith(SENT_PREFIX)
+                      const text   = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
+                      return (
+                        <div key={i} style={{ background: isSent ? 'var(--surface-2)' : 'oklch(0.7 0.12 150 / 0.08)', border: isSent ? '1px solid var(--border)' : '1px solid oklch(0.7 0.12 150 / 0.2)', borderRadius: 11, padding: '11px 13px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
+                            <span style={{ width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: isSent ? 'var(--accent-soft)' : 'oklch(0.7 0.12 150 / 0.15)', border: isSent ? '1px solid var(--accent-line)' : '1px solid oklch(0.7 0.12 150 / 0.3)' }}>
+                              <Icon name="mail" size={11} style={{ color: isSent ? 'var(--accent-hi)' : 'oklch(0.74 0.14 150)' }} />
+                            </span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{isSent ? 'Odesláno' : 'Přijato'}</span>
+                            <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
+                          </div>
+                          <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{text}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Odpovědět uživateli */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Odpovědět uživateli</div>
+                {item.user_email ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="mail" size={13} />
+                      {item.user_email}
+                    </div>
+                    {replyResult && (
+                      <div className={replyResult.ok ? 'success-banner' : 'error-banner'} style={{ marginBottom: 10 }}>
+                        {replyResult.ok ? `✓ ${replyResult.msg}` : `✕ ${replyResult.msg}`}
+                      </div>
+                    )}
+                    <textarea
+                      value={replyDraft}
+                      onChange={e => { setReplyDraft(e.target.value); setReplyResult(null) }}
+                      placeholder="Napiš odpověď uživateli…"
+                      style={{ width: '100%', minHeight: 80, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
+                      onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
+                      onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                    />
+                    <button onClick={handleSendReply} disabled={!replyDraft.trim() || sendingReply}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !replyDraft.trim() || sendingReply ? 0.45 : 1 }}
+                      onMouseEnter={e => { if (replyDraft.trim() && !sendingReply) e.currentTarget.style.background = 'var(--accent-hi)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}>
+                      <Icon name="mail" size={15} />
+                      {sendingReply ? 'Odesílám…' : 'Odeslat e-mail'}
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Feedback neobsahuje e-mail uživatele.</div>
+                )}
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB: Poznámky */}
+          {activeTab === 'notes' && (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Interní poznámky</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: notes.length > 0 ? 13 : 0 }}>
+                {notes.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', paddingBottom: 4 }}>Zatím žádné poznámky.</div>}
+                {notes.map((n, i) => (
+                  <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 11, padding: '11px 13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
+                      <Avatar email={n.author} size={20} />
+                      <strong style={{ fontWeight: 700 }}>{n.author}</strong>
+                      <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500 }}>{timeAgo(n.at)}</span>
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{n.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <textarea value={noteDraft} onChange={e => setNoteDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
+                  placeholder="Přidat poznámku… (Ctrl+Enter)"
+                  style={{ width: '100%', minHeight: 64, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }} />
+                <button onClick={handleAddNote} disabled={!noteDraft.trim() || addingNote}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !noteDraft.trim() || addingNote ? 0.45 : 1 }}
+                  onMouseEnter={e => { if (noteDraft.trim()) e.currentTarget.style.background = 'var(--accent-hi)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}>
+                  <Icon name="plus" size={15} />
+                  {addingNote ? 'Ukládám…' : 'Přidat poznámku'}
+                </button>
+              </div>
+            </div>
+          )}
 
         </aside>
       </div>
