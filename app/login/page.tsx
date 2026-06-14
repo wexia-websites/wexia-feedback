@@ -20,64 +20,43 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-    }}>
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 24px' }}>
-        <div className="card">
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
-              Feedback Admin
-            </h1>
-            <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>
-              AI Laboratoř — správa feedbacků
-            </p>
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">✦</div>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 4, marginTop: 10 }}>
+          Feedback Admin
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>
+          AI Laboratoř — správa feedbacků
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16, textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 5 }}>
+              Heslo
+            </label>
+            <input
+              className="form-input"
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }}
+              placeholder="Zadej heslo..."
+              autoFocus
+            />
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
-                Heslo
-              </label>
-              <input
-                className="input"
-                type="password"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError('') }}
-                placeholder="Zadej heslo..."
-                style={{ width: '100%', boxSizing: 'border-box' }}
-                autoFocus
-              />
-            </div>
+          {error && (
+            <div className="error-banner">{error}</div>
+          )}
 
-            {error && (
-              <div style={{
-                background: 'rgba(239,68,68,0.1)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 8,
-                padding: '10px 14px',
-                color: '#ef4444',
-                fontSize: 14,
-                marginBottom: 16,
-              }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', padding: '12px 16px', fontSize: 15 }}
-            >
-              Přihlásit se →
-            </button>
-          </form>
-        </div>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', fontSize: 14 }}
+          >
+            Přihlásit se →
+          </button>
+        </form>
       </div>
     </div>
   )
