@@ -72,6 +72,9 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
 
     console.log('STATUS UPDATE response:', { data, error: err })
 
+    const check = await supabase.from('feedback').select('id, status').eq('id', id).maybeSingle()
+    console.log('STATUS CHECK po update:', check.data, check.error)
+
     if (err) {
       // Rollback
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: r.status } : r))
