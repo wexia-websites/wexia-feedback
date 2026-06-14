@@ -630,6 +630,18 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* ── NAV HUE THEMING (category / status items with --h variable) ── */
+.nav-link[style*="--h"] .nav-icon { color: oklch(0.72 0.13 var(--h)); }
+.nav-link[style*="--h"].active {
+  background: oklch(0.72 0.13 var(--h) / 0.13);
+  color: oklch(0.84 0.11 var(--h));
+}
+[data-theme="dark"] .nav-link[style*="--h"].active { color: oklch(0.84 0.11 var(--h)); }
+[data-theme="light"] .nav-link[style*="--h"].active { color: oklch(0.52 0.15 var(--h)); }
+.nav-link[style*="--h"].active .nav-icon { color: oklch(0.74 0.14 var(--h)); }
+.nav-link[style*="--h"].active::before { background: oklch(0.72 0.14 var(--h)); }
+.nav-link[style*="--h"].active .nav-count { background: oklch(0.66 0.15 var(--h)); color: #fff; }
+
 /* ── MOBILE ── */
 @media (max-width: 768px) {
   .app { flex-direction: column; }
