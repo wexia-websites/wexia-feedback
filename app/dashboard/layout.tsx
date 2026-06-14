@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
+import { FeedbackProvider } from '@/lib/feedback-context'
 
 export default function DashboardLayout({
   children,
@@ -7,11 +8,13 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="app">
-      <Suspense fallback={null}>
-        <Sidebar />
-      </Suspense>
-      <main className="main">{children}</main>
-    </div>
+    <FeedbackProvider>
+      <div className="app">
+        <Suspense fallback={null}>
+          <Sidebar />
+        </Suspense>
+        <main className="main">{children}</main>
+      </div>
+    </FeedbackProvider>
   )
 }
