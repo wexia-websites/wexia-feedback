@@ -20,6 +20,7 @@ export type FeedbackItem = {
   user_agent: string | null
   timestamp: string | null
   status: string | null
+  source_app: string | null
   notes: Note[]
 }
 

@@ -210,6 +210,7 @@ export default function FeedbackDetailPage() {
               { icon: 'globe',    label: 'Stránka',   value: item.url || '—',        mono: true,  link: item.url ?? undefined },
               { icon: 'monitor',  label: 'Prohlížeč', value: item.user_agent || '—', mono: false, link: undefined },
               { icon: 'calendar', label: 'Přijato',   value: fmtDate(item.timestamp), mono: false, link: undefined },
+              { icon: 'layers',   label: 'Zdroj',     value: item.source_app || 'AI Laboratoř', mono: false, link: undefined },
             ].map((m, i, arr) => (
               <div key={m.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', borderBottom: i < arr.length - 2 ? '1px solid var(--border)' : 'none' }}>
                 <span style={{ width: 32, height: 32, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', color: 'var(--text-2)', flexShrink: 0 }}>

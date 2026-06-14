@@ -169,13 +169,21 @@ function DashboardContent() {
   const urlCategory = searchParams.get('category') ?? ''
   const isListView  = urlStatus !== '' || urlCategory !== ''
 
-  const [q, setQ]       = useState('')
-  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
+  const [q, setQ]             = useState('')
+  const [sort, setSort]       = useState<'newest' | 'oldest'>('newest')
   const [statusF, setStatusF] = useState(urlStatus)
+  const [sourceApp, setSourceApp] = useState('')
 
   // Sync status chip with URL
   const prevUrlStatus = urlStatus
   if (statusF !== prevUrlStatus && !q) setStatusF(urlStatus)
+
+  // Distinct source_app values from all reports
+  const sourceApps = useMemo(() => {
+    const vals = new Set<string>()
+    reports.forEach(r => { if (r.source_app) vals.add(r.source_app) })
+    return Array.from(vals).sort()
+  }, [reports])
 
   const countStatus = (s: string) => reports.filter(r => (r.status || 'new') === s).length
 
@@ -193,7 +201,8 @@ function DashboardContent() {
 
   const filtered = useMemo(() => {
     let list = base
-    if (statusF) list = list.filter(i => (i.status || 'new') === statusF)
+    if (statusF)   list = list.filter(i => (i.status || 'new') === statusF)
+    if (sourceApp) list = list.filter(i => (i.source_app || 'AI Laboratoř') === sourceApp)
     if (q.trim()) {
       const t = q.toLowerCase()
       list = list.filter(i =>
@@ -207,7 +216,7 @@ function DashboardContent() {
       const tb = new Date(b.timestamp || 0).getTime()
       return sort === 'newest' ? tb - ta : ta - tb
     })
-  }, [base, statusF, q, sort])
+  }, [base, statusF, sourceApp, q, sort])
 
   let heading = 'Všechny reporty', sub = 'Kompletní zpětná vazba'
   if (urlStatus && STATUSES[urlStatus as StatusId]) {
@@ -317,6 +326,16 @@ function DashboardContent() {
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14, fontWeight: 500, padding: '12px 0', fontFamily: 'inherit' }} />
             {q && <button onClick={() => setQ('')} style={{ color: 'var(--text-3)', display: 'grid', placeItems: 'center', padding: 4, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer' }}><Icon name="x" size={14} /></button>}
           </div>
+          <Dropdown
+            value={sourceApp}
+            onChange={setSourceApp}
+            prefixIcon="layers"
+            minWidth={152}
+            options={[
+              { value: '', label: 'Vše (zdroj)' },
+              ...sourceApps.map(s => ({ value: s, label: s })),
+            ]}
+          />
           <Dropdown
             value={sort}
             onChange={v => setSort(v as 'newest' | 'oldest')}
