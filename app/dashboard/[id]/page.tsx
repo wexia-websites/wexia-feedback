@@ -88,6 +88,9 @@ export default function FeedbackDetailPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [addingNote, setAddingNote] = useState(false)
+  const [replyDraft, setReplyDraft] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
+  const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   // Report z kontextu — žádný vlastní fetch
   const item = reports.find(r => r.id === id) ?? null
@@ -103,6 +106,36 @@ export default function FeedbackDetailPage() {
     setSuccessMsg(`Status: ${STATUSES[newStatus as StatusId]?.label ?? newStatus}`)
     setTimeout(() => setSuccessMsg(''), 3000)
     setUpdating(false)
+  }
+
+  async function handleSendReply() {
+    if (!replyDraft.trim()) return
+    setSendingReply(true)
+    setReplyResult(null)
+    try {
+      const res = await fetch('/api/send-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbackId: id, replyText: replyDraft.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setReplyResult({ ok: false, msg: json.error ?? 'Chyba při odesílání.' })
+      } else {
+        const sentAt = new Date().toISOString()
+        setReplyResult({ ok: true, msg: `Odesláno ${new Date(sentAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` })
+        const note: Note = {
+          author: 'Tým',
+          at: sentAt,
+          text: `📧 Odpověď uživateli: ${replyDraft.trim()}`,
+        }
+        await addNote(id, note)
+        setReplyDraft('')
+      }
+    } catch {
+      setReplyResult({ ok: false, msg: 'Síťová chyba. Zkus to znovu.' })
+    }
+    setSendingReply(false)
   }
 
   async function handleAddNote() {
@@ -301,6 +334,51 @@ export default function FeedbackDetailPage() {
               </button>
             </div>
           </div>
+          {/* Odpovědět uživateli */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>
+              Odpovědět uživateli
+            </div>
+
+            {item.user_email ? (
+              <>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="mail" size={13} />
+                  {item.user_email}
+                </div>
+
+                {replyResult && (
+                  <div className={replyResult.ok ? 'success-banner' : 'error-banner'} style={{ marginBottom: 10 }}>
+                    {replyResult.ok ? `✓ ${replyResult.msg}` : `✕ ${replyResult.msg}`}
+                  </div>
+                )}
+
+                <textarea
+                  value={replyDraft}
+                  onChange={e => { setReplyDraft(e.target.value); setReplyResult(null) }}
+                  placeholder="Napiš odpověď uživateli…"
+                  style={{ width: '100%', minHeight: 80, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                />
+                <button
+                  onClick={handleSendReply}
+                  disabled={!replyDraft.trim() || sendingReply}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !replyDraft.trim() || sendingReply ? 0.45 : 1 }}
+                  onMouseEnter={e => { if (replyDraft.trim() && !sendingReply) e.currentTarget.style.background = 'var(--accent-hi)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}
+                >
+                  <Icon name="mail" size={15} />
+                  {sendingReply ? 'Odesílám…' : 'Odeslat e-mail'}
+                </button>
+              </>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                Feedback neobsahuje e-mail uživatele.
+              </div>
+            )}
+          </div>
+
         </aside>
       </div>
     </>
