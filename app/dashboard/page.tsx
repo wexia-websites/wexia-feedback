@@ -55,6 +55,7 @@ function formatUrl(url: string | null) {
 }
 
 function FeedbackCard({ item }: { item: Feedback }) {
+  const router = useRouter()
   const screenshotSrc = item.screenshot_url
     ? item.screenshot_url
     : item.screenshot
@@ -62,7 +63,11 @@ function FeedbackCard({ item }: { item: Feedback }) {
       : null
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      className="card"
+      onClick={() => router.push(`/dashboard/${item.id}`)}
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}
+    >
       {/* Badges + datum */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -114,7 +119,12 @@ function FeedbackCard({ item }: { item: Feedback }) {
 
       {/* Detail odkaz */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-        <Link href={`/dashboard/${item.id}`} className="btn btn-outline" style={{ fontSize: 12 }}>
+        <Link
+          href={`/dashboard/${item.id}`}
+          className="btn btn-outline"
+          style={{ fontSize: 12 }}
+          onClick={e => e.stopPropagation()}
+        >
           Detail →
         </Link>
       </div>
