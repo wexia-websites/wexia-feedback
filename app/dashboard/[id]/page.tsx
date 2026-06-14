@@ -82,7 +82,7 @@ export default function FeedbackDetailPage() {
   const params = useParams()
   const id = params.id as string
 
-  const { reports, loading, updateStatus, addNote } = useFeedback()
+  const { reports, loading, updateStatus, addNote, refresh } = useFeedback()
 
   const [updating, setUpdating] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
@@ -91,6 +91,8 @@ export default function FeedbackDetailPage() {
   const [replyDraft, setReplyDraft] = useState('')
   const [sendingReply, setSendingReply] = useState(false)
   const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [checkingEmails, setCheckingEmails] = useState(false)
+  const [checkResult, setCheckResult] = useState<string | null>(null)
 
   // Report z kontextu — žádný vlastní fetch
   const item = reports.find(r => r.id === id) ?? null
@@ -138,6 +140,26 @@ export default function FeedbackDetailPage() {
     setSendingReply(false)
   }
 
+  async function handleCheckEmails() {
+    setCheckingEmails(true)
+    setCheckResult(null)
+    try {
+      const res = await fetch('/api/check-emails', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setCheckResult(`Chyba: ${json.error ?? 'Neznámá chyba'}`)
+      } else {
+        setCheckResult(json.processed > 0
+          ? `Načteno ${json.processed} nových odpovědí.`
+          : 'Žádné nové odpovědi.')
+        await refresh()
+      }
+    } catch {
+      setCheckResult('Síťová chyba.')
+    }
+    setCheckingEmails(false)
+  }
+
   async function handleAddNote() {
     if (!noteDraft.trim()) return
     setAddingNote(true)
@@ -163,10 +185,11 @@ export default function FeedbackDetailPage() {
       : null
 
   const title = deriveTitle(item.comment)
-  const EMAIL_PREFIX = '📧 Odpověď uživateli: '
+  const SENT_PREFIX = '📧 Odpověď uživateli: '
+  const RECV_PREFIX = '📨 Odpověď od uživatele:\n'
   const allNotes: Note[] = item.notes ?? []
-  const emailNotes    = allNotes.filter(n => n.text.startsWith(EMAIL_PREFIX))
-  const notes         = allNotes.filter(n => !n.text.startsWith(EMAIL_PREFIX))
+  const emailNotes = allNotes.filter(n => n.text.startsWith(SENT_PREFIX) || n.text.startsWith(RECV_PREFIX))
+  const notes      = allNotes.filter(n => !n.text.startsWith(SENT_PREFIX) && !n.text.startsWith(RECV_PREFIX))
 
   return (
     <>
@@ -339,23 +362,57 @@ export default function FeedbackDetailPage() {
           </div>
           {/* E-maily */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>E-maily</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-maily</div>
+              <button
+                onClick={handleCheckEmails}
+                disabled={checkingEmails}
+                title="Zkontrolovat nové e-maily"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
+                onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              >
+                <Icon name="trend" size={13} style={{ transform: checkingEmails ? 'none' : undefined }} />
+                {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
+              </button>
+            </div>
+
+            {checkResult && (
+              <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', marginBottom: 10, fontStyle: 'italic' }}>
+                {checkResult}
+              </div>
+            )}
+
             {emailNotes.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím nebyly odeslány žádné e-maily.</div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím žádné e-maily.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {emailNotes.map((n, i) => (
-                  <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 11, padding: '11px 13px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
-                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                        <Icon name="mail" size={11} style={{ color: 'var(--accent-hi)' }} />
-                      </span>
-                      <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Odpověď odeslána uživateli</span>
-                      <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
+                {emailNotes.map((n, i) => {
+                  const isSent = n.text.startsWith(SENT_PREFIX)
+                  const text   = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
+                  return (
+                    <div key={i} style={{
+                      background: isSent ? 'var(--surface-2)' : 'oklch(0.7 0.12 150 / 0.08)',
+                      border: isSent ? '1px solid var(--border)' : '1px solid oklch(0.7 0.12 150 / 0.2)',
+                      borderRadius: 11, padding: '11px 13px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
+                        <span style={{
+                          width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0,
+                          background: isSent ? 'var(--accent-soft)' : 'oklch(0.7 0.12 150 / 0.15)',
+                          border: isSent ? '1px solid var(--accent-line)' : '1px solid oklch(0.7 0.12 150 / 0.3)',
+                        }}>
+                          <Icon name="mail" size={11} style={{ color: isSent ? 'var(--accent-hi)' : 'oklch(0.74 0.14 150)' }} />
+                        </span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>
+                          {isSent ? 'Odpověď odeslána uživateli' : 'Odpověď od uživatele'}
+                        </span>
+                        <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
+                      </div>
+                      <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{text}</p>
                     </div>
-                    <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{n.text.slice(EMAIL_PREFIX.length)}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

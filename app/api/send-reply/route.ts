@@ -42,9 +42,7 @@ export async function POST(req: NextRequest) {
       text: bodyText,
     }
 
-    if (process.env.REPLY_TO_EMAIL) {
-      emailPayload.replyTo = process.env.REPLY_TO_EMAIL
-    }
+    emailPayload.replyTo = `wexia.feedback+${feedbackId}@gmail.com`
 
     const { error: sendError } = await resend.emails.send(emailPayload)
 
