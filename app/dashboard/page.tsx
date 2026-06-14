@@ -3,6 +3,7 @@
 import { useState, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useFeedback } from '@/lib/feedback-context'
+import Dropdown from '@/components/Dropdown'
 import {
   Icon, CatBadge, StatusPill, Avatar,
   CATEGORIES, STATUSES, CAT_ORDER, STATUS_ORDER, CAT_ICON, STATUS_ICON,
@@ -316,15 +317,16 @@ function DashboardContent() {
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14, fontWeight: 500, padding: '12px 0', fontFamily: 'inherit' }} />
             {q && <button onClick={() => setQ('')} style={{ color: 'var(--text-3)', display: 'grid', placeItems: 'center', padding: 4, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer' }}><Icon name="x" size={14} /></button>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 11, padding: '0 12px', position: 'relative' }}>
-            <Icon name="trend" size={15} style={{ color: 'var(--text-3)' }} />
-            <select value={sort} onChange={e => setSort(e.target.value as 'newest' | 'oldest')}
-              style={{ appearance: 'none', background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, padding: '12px 22px 12px 0', cursor: 'pointer' }}>
-              <option value="newest">Nejnovější</option>
-              <option value="oldest">Nejstarší</option>
-            </select>
-            <Icon name="chevronDown" size={14} style={{ color: 'var(--text-3)', position: 'absolute', right: 11, pointerEvents: 'none' }} />
-          </div>
+          <Dropdown
+            value={sort}
+            onChange={v => setSort(v as 'newest' | 'oldest')}
+            prefixIcon="trend"
+            minWidth={148}
+            options={[
+              { value: 'newest', label: 'Nejnovější' },
+              { value: 'oldest', label: 'Nejstarší' },
+            ]}
+          />
         </div>
 
         {!urlStatus && (
