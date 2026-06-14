@@ -45,7 +45,6 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       .from('feedback')
       .select('*')
       .order('timestamp', { ascending: false })
-    console.log('PROVIDER FETCH spuštěn, počet reportů:', data?.length, err ? 'ERROR:' + err.message : '')
     if (err) { setError(err.message); return }
     setReports((data ?? []).map(r => ({ ...r, notes: r.notes ?? [] })))
   }, [])
@@ -59,21 +58,14 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   }, [load])
 
   const updateStatus = useCallback(async (id: string, status: string) => {
-    console.log('STATUS UPDATE start:', id, '→', status)
     // Optimistic update
     setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r))
     setError(null)
 
-    const { data, error: err } = await supabase
+    const { error: err } = await supabase
       .from('feedback')
       .update({ status })
       .eq('id', id)
-      .select('id, status')
-
-    console.log('STATUS UPDATE response:', { data, error: err })
-
-    const check = await supabase.from('feedback').select('id, status').eq('id', id).maybeSingle()
-    console.log('STATUS CHECK po update:', check.data, check.error)
 
     if (err) {
       // Rollback
