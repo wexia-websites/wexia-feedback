@@ -105,7 +105,7 @@ export default function Sidebar() {
           <div className="sidebar-logo-mark">w</div>
           <div className="sidebar-logo-text">
             <strong>Feedback</strong>
-            <span>AI Laboratoř · wexia</span>
+            <span>Wexia Digital</span>
           </div>
         </div>
 
