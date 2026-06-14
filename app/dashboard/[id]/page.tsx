@@ -163,7 +163,10 @@ export default function FeedbackDetailPage() {
       : null
 
   const title = deriveTitle(item.comment)
-  const notes: Note[] = item.notes ?? []
+  const EMAIL_PREFIX = '📧 Odpověď uživateli: '
+  const allNotes: Note[] = item.notes ?? []
+  const emailNotes    = allNotes.filter(n => n.text.startsWith(EMAIL_PREFIX))
+  const notes         = allNotes.filter(n => !n.text.startsWith(EMAIL_PREFIX))
 
   return (
     <>
@@ -334,6 +337,29 @@ export default function FeedbackDetailPage() {
               </button>
             </div>
           </div>
+          {/* E-maily */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>E-maily</div>
+            {emailNotes.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím nebyly odeslány žádné e-maily.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {emailNotes.map((n, i) => (
+                  <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 11, padding: '11px 13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                        <Icon name="mail" size={11} style={{ color: 'var(--accent-hi)' }} />
+                      </span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Odpověď odeslána uživateli</span>
+                      <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{n.text.slice(EMAIL_PREFIX.length)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Odpovědět uživateli */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>
