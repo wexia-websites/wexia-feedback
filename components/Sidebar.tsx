@@ -54,6 +54,12 @@ export default function Sidebar() {
   const countStatus = (s: string) => reports.filter(r => (r.status || 'new') === s).length
   const countCat    = (c: string) => reports.filter(r => r.category === c).length
 
+  const SENT_PREFIX = '📧 Odpověď uživateli: '
+  const RECV_PREFIX = '📨 Odpověď od uživatele:\n'
+  const emailCount  = reports.reduce((acc, r) =>
+    acc + (r.notes ?? []).filter(n => n.text.startsWith(SENT_PREFIX) || n.text.startsWith(RECV_PREFIX)).length, 0
+  )
+
   function toggleSidebar(val: boolean) {
     setOpen(val)
     localStorage.setItem('sidebar_open', String(val))
@@ -71,9 +77,10 @@ export default function Sidebar() {
     router.push(`/dashboard${q ? '?' + q : ''}`)
   }
 
-  const isDashboard  = pathname === '/dashboard'
-  const curStatus    = isDashboard ? (searchParams.get('status') ?? '') : ''
-  const curCategory  = isDashboard ? (searchParams.get('category') ?? '') : ''
+  const isDashboard    = pathname === '/dashboard'
+  const isEmailsPage   = pathname === '/dashboard/emails'
+  const curStatus      = isDashboard ? (searchParams.get('status') ?? '') : ''
+  const curCategory    = isDashboard ? (searchParams.get('category') ?? '') : ''
 
   const isStatusActive   = (id: string) => isDashboard && curStatus === id && curCategory === ''
   const isCategoryActive = (id: string) => isDashboard && curCategory === id && curStatus === ''
@@ -111,6 +118,13 @@ export default function Sidebar() {
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 4 }}>
           <NavItem icon="dashboard" label="Přehled" active={isDashboardHome} onClick={() => navTo({})} />
+          <NavItem
+            icon="mail"
+            label="E-maily"
+            count={emailCount || undefined}
+            active={isEmailsPage}
+            onClick={() => router.push('/dashboard/emails')}
+          />
 
           <div className="nav-section-heading">Stav</div>
           {STATUS_ORDER.map(s => (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useFeedback } from '@/lib/feedback-context'
 import type { Note } from '@/lib/feedback-context'
@@ -80,6 +80,7 @@ function ElementPreview({ selector, html }: { selector: string | null; html: str
 export default function FeedbackDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params.id as string
 
   const { reports, loading, updateStatus, addNote, refresh } = useFeedback()
@@ -93,7 +94,10 @@ export default function FeedbackDetailPage() {
   const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [checkingEmails, setCheckingEmails] = useState(false)
   const [checkResult, setCheckResult] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'status' | 'emails' | 'notes'>('status')
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<'status' | 'emails' | 'notes'>(
+    tabParam === 'emails' ? 'emails' : tabParam === 'notes' ? 'notes' : 'status'
+  )
 
   // Report z kontextu — žádný vlastní fetch
   const item = reports.find(r => r.id === id) ?? null
