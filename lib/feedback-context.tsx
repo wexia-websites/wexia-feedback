@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
-export type Note = { author: string; at: string; text: string }
+export type Note = { author: string; at: string; text: string; gmailMessageId?: string }
 
 export type FeedbackItem = {
   id: string

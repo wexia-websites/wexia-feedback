@@ -80,7 +80,7 @@ export async function POST() {
       // ISO datum z e-mailu (fallback na teď)
       const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
 
-      // Přidej poznámku do Supabase
+      // Načti existující notes a zkontroluj duplicitu
       const { data: feedback } = await supabase
         .from('feedback')
         .select('notes')
@@ -89,24 +89,22 @@ export async function POST() {
 
       if (!feedback) continue
 
-      const existingNotes = (feedback.notes ?? []) as Array<{ author: string; at: string; text: string }>
+      const existingNotes = (feedback.notes ?? []) as Array<{ author: string; at: string; text: string; gmailMessageId?: string }>
+
+      // Přeskoč pokud zprávu už máme (dedup podle gmailMessageId)
+      if (existingNotes.some(n => n.gmailMessageId === msg.id)) continue
+
       const newNote = {
         author: 'Uživatel',
         at: sentAt,
         text: `📨 Odpověď od uživatele:\n${body}`,
+        gmailMessageId: msg.id,
       }
 
       await supabase
         .from('feedback')
         .update({ notes: [...existingNotes, newNote] })
         .eq('id', feedbackId)
-
-      // Označ jako přečtené
-      await gmail.users.messages.modify({
-        userId: 'me',
-        id: msg.id,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      })
 
       processed++
     }
