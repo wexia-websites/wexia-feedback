@@ -56,9 +56,17 @@ export default function Sidebar() {
 
   const SENT_PREFIX = '📧 Odpověď uživateli: '
   const RECV_PREFIX = '📨 Odpověď od uživatele:\n'
-  const emailCount  = reports.reduce((acc, r) =>
-    acc + (r.notes ?? []).filter(n => n.text.startsWith(SENT_PREFIX) || n.text.startsWith(RECV_PREFIX)).length, 0
-  )
+  // Počet konverzací kde poslední zpráva je od uživatele (čeká na odpověď)
+  const emailCount  = reports.filter(r => {
+    const emailNotes = (r.notes ?? []).filter(n =>
+      n.text.startsWith(SENT_PREFIX) || n.text.startsWith(RECV_PREFIX)
+    )
+    if (emailNotes.length === 0) return false
+    const last = emailNotes.reduce((a, b) =>
+      new Date(a.at).getTime() > new Date(b.at).getTime() ? a : b
+    )
+    return last.text.startsWith(RECV_PREFIX)
+  }).length
 
   function toggleSidebar(val: boolean) {
     setOpen(val)
