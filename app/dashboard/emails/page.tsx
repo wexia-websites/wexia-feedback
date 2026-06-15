@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeedback } from '@/lib/feedback-context'
-import { Icon, CatBadge, Avatar, timeAgo, deriveTitle } from '@/lib/feedback-ui'
+import { Icon, CatBadge, Avatar, timeAgo, deriveTitle, stripEmailQuote } from '@/lib/feedback-ui'
 import Dropdown from '@/components/Dropdown'
 
 const SENT_PREFIX = '📧 Odpověď uživateli: '
@@ -49,7 +49,7 @@ export default function EmailsPage() {
             reportEmail: r.user_email,
             category: r.category,
             type: 'received',
-            text: n.text.slice(RECV_PREFIX.length),
+            text: stripEmailQuote(n.text.slice(RECV_PREFIX.length)),
             at: n.at,
           })
         }

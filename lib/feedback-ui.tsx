@@ -200,6 +200,19 @@ export function timeAgo(iso: string | null): string {
   return fmtDate(iso)
 }
 
+/* ── Strip email quote (citace původní zprávy) ── */
+export function stripEmailQuote(text: string): string {
+  const lines = text.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith('>')) {
+      // Najdi začátek bloku — vynech i předchozí "napsal:" řádek
+      const cutAt = (i > 0 && /napsal|wrote/i.test(lines[i - 1])) ? i - 1 : i
+      return lines.slice(0, cutAt).join('\n').trim()
+    }
+  }
+  return text.trim()
+}
+
 /* ── Title helper — odvodi z comment ── */
 export function deriveTitle(comment: string | null): string {
   if (!comment) return 'Bez komentáře'

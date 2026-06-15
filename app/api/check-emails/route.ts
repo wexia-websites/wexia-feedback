@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
+import { stripEmailQuote } from '@/lib/feedback-ui'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -74,9 +75,7 @@ export async function POST() {
       const feedbackId = match[1]
 
       // Tělo zprávy (plain text) — odřízni citaci původní zprávy
-      const rawBody = extractPlainText(full.data.payload)
-      const quoteMatch = /\n.*(napsal|wrote):\s*\n/i.exec(rawBody)
-      const body = (quoteMatch ? rawBody.slice(0, quoteMatch.index) : rawBody).trim()
+      const body = stripEmailQuote(extractPlainText(full.data.payload))
       if (!body) continue
 
       // ISO datum z e-mailu (fallback na teď)

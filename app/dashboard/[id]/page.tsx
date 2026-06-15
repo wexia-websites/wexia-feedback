@@ -8,7 +8,7 @@ import type { Note } from '@/lib/feedback-context'
 import {
   Icon, CatBadge, StatusPill, Avatar,
   CATEGORIES, STATUSES, STATUS_ORDER, STATUS_ICON,
-  fmtDate, timeAgo, deriveTitle,
+  fmtDate, timeAgo, deriveTitle, stripEmailQuote,
   type CategoryId, type StatusId,
 } from '@/lib/feedback-ui'
 
@@ -377,59 +377,70 @@ export default function FeedbackDetailPage() {
           {activeTab === 'emails' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-              {/* Historie e-mailů */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-maily</div>
-                  <button
-                    onClick={handleCheckEmails}
-                    disabled={checkingEmails}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
-                    onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-                  >
-                    <Icon name="trend" size={13} />
-                    {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
-                  </button>
+              {/* Hlavička + tlačítko zkontrolovat */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konverzace</div>
+                <button
+                  onClick={handleCheckEmails}
+                  disabled={checkingEmails}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
+                  onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                >
+                  <Icon name="trend" size={13} />
+                  {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
+                </button>
+              </div>
+
+              {checkResult && (
+                <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', fontStyle: 'italic' }}>
+                  {checkResult}
                 </div>
-                {checkResult && (
-                  <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', marginBottom: 10, fontStyle: 'italic' }}>
-                    {checkResult}
-                  </div>
-                )}
-                {emailNotes.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Zatím žádné e-maily.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {emailNotes.map((n, i) => {
+              )}
+
+              {/* Chat bubliny — chronologicky */}
+              {emailNotes.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', textAlign: 'center', padding: '16px 0' }}>
+                  Zatím žádná komunikace.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[...emailNotes]
+                    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                    .map((n, i) => {
                       const isSent = n.text.startsWith(SENT_PREFIX)
-                      const text   = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
+                      const rawText = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
+                      const text = isSent ? rawText : stripEmailQuote(rawText)
                       return (
-                        <div key={i} style={{ background: isSent ? 'var(--surface-2)' : 'oklch(0.7 0.12 150 / 0.08)', border: isSent ? '1px solid var(--border)' : '1px solid oklch(0.7 0.12 150 / 0.2)', borderRadius: 11, padding: '11px 13px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 }}>
-                            <span style={{ width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: isSent ? 'var(--accent-soft)' : 'oklch(0.7 0.12 150 / 0.15)', border: isSent ? '1px solid var(--accent-line)' : '1px solid oklch(0.7 0.12 150 / 0.3)' }}>
-                              <Icon name="mail" size={11} style={{ color: isSent ? 'var(--accent-hi)' : 'oklch(0.74 0.14 150)' }} />
-                            </span>
-                            <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{isSent ? 'Odesláno' : 'Přijato'}</span>
-                            <span style={{ color: 'var(--text-3)', marginLeft: 'auto', fontWeight: 500, whiteSpace: 'nowrap' }}>{timeAgo(n.at)}</span>
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isSent ? 'flex-end' : 'flex-start' }}>
+                          {/* Label */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+                            {!isSent && item.user_email && <Avatar email={item.user_email} size={16} />}
+                            <span>{isSent ? 'Wexia Feedback' : (item.user_email ?? 'Uživatel')}</span>
                           </div>
-                          <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{text}</p>
+                          {/* Bublina */}
+                          <div style={{
+                            maxWidth: '88%',
+                            background: isSent ? 'var(--accent-soft)' : 'var(--surface-2)',
+                            border: isSent ? '1px solid var(--accent-line)' : '1px solid var(--border)',
+                            borderRadius: isSent ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                            padding: '10px 13px',
+                          }}>
+                            <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap', margin: 0, wordBreak: 'break-word' }}>{text}</p>
+                          </div>
+                          {/* Čas */}
+                          <span style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3, fontWeight: 500 }}>{timeAgo(n.at)}</span>
                         </div>
                       )
                     })}
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Odpovědět uživateli */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Odpovědět uživateli</div>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Odpovědět</div>
                 {item.user_email ? (
                   <>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Icon name="mail" size={13} />
-                      {item.user_email}
-                    </div>
                     {replyResult && (
                       <div className={replyResult.ok ? 'success-banner' : 'error-banner'} style={{ marginBottom: 10 }}>
                         {replyResult.ok ? `✓ ${replyResult.msg}` : `✕ ${replyResult.msg}`}
