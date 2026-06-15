@@ -211,18 +211,17 @@ export default function EmailsPage() {
             {filtered.map(c => {
               const isSent = c.lastType === 'sent'
               const snippet = c.lastText.replace(/\n/g, ' ')
-              const snippetFull = isSent ? `Vy: ${snippet}` : snippet
               return (
                 <button
                   key={c.reportId}
                   onClick={() => router.push(`/dashboard/${c.reportId}?tab=emails`)}
                   style={{
-                    display: 'flex', alignItems: 'stretch', gap: 14, textAlign: 'left',
+                    display: 'flex', alignItems: 'stretch', gap: 12, textAlign: 'left',
                     background: 'var(--surface)',
                     border: c.awaitingReply ? '1px solid var(--accent-line)' : '1px solid var(--border)',
-                    borderRadius: 13, padding: '14px 16px',
+                    borderRadius: 13, padding: '13px 14px',
                     boxShadow: 'var(--shadow)', width: '100%', fontFamily: 'inherit',
-                    cursor: 'pointer', transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+                    cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
                   }}
                   onMouseEnter={ev => {
                     ev.currentTarget.style.transform = 'translateY(-1px)'
@@ -235,40 +234,60 @@ export default function EmailsPage() {
                 >
                   {/* Avatar */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0, paddingTop: 2 }}>
-                    <Avatar email={c.reportEmail} size={38} />
+                    <Avatar email={c.reportEmail} size={32} />
                   </div>
 
                   {/* Obsah */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {/* Horní řádek: badge + title + čas */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+                    {/* Horní řádek: title + čas + awaiting badge */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <CatBadge cat={c.category || 'other'} size="sm" />
-                      <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {c.reportTitle}
                       </span>
+                      {c.awaitingReply && (
+                        <span style={{
+                          fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20, flexShrink: 0,
+                          background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
+                          color: 'var(--accent-hi)', whiteSpace: 'nowrap',
+                        }}>
+                          Čeká na odpověď
+                        </span>
+                      )}
                       <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {timeAgo(c.lastAt)}
                       </span>
                     </div>
 
-                    {/* Email uživatele */}
-                    {c.reportEmail && (
-                      <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>{c.reportEmail}</span>
-                    )}
+                    {/* Kategorie + email */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <CatBadge cat={c.category || 'other'} size="sm" />
+                      {c.reportEmail && (
+                        <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 500 }}>{c.reportEmail}</span>
+                      )}
+                    </div>
 
-                    {/* Náhled poslední zprávy */}
-                    <p style={{
-                      fontSize: 13, color: c.awaitingReply ? 'var(--text)' : 'var(--text-3)',
-                      fontWeight: c.awaitingReply ? 600 : 400,
-                      lineHeight: 1.45, margin: 0,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    {/* Náhled poslední zprávy — bublina */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 5, marginTop: 2,
                     }}>
-                      {snippetFull}
-                    </p>
+                      <span style={{ fontSize: 12, flexShrink: 0 }}>{isSent ? '📧' : '📨'}</span>
+                      <span style={{
+                        flex: 1, minWidth: 0,
+                        fontSize: 12.5, lineHeight: 1.4,
+                        padding: '4px 9px', borderRadius: isSent ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
+                        background: isSent ? 'var(--accent-soft)' : 'var(--surface-2)',
+                        border: isSent ? '1px solid var(--accent-line)' : '1px solid var(--border)',
+                        color: isSent ? 'var(--accent-hi)' : 'var(--text-2)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {isSent ? `Vy: ${snippet}` : snippet}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Pravý sloupec: počet zpráv + awaiting badge */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between', flexShrink: 0, gap: 6 }}>
+                  {/* Pravý sloupec: počet zpráv + šipka */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between', flexShrink: 0 }}>
                     <span style={{
                       fontSize: 11.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
                       background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -276,16 +295,7 @@ export default function EmailsPage() {
                     }}>
                       {c.count} {c.count === 1 ? 'zpráva' : c.count < 5 ? 'zprávy' : 'zpráv'}
                     </span>
-                    {c.awaitingReply && (
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                        background: 'var(--accent-soft)', border: '1px solid var(--accent-line)',
-                        color: 'var(--accent-hi)', whiteSpace: 'nowrap',
-                      }}>
-                        Čeká na odpověď
-                      </span>
-                    )}
-                    {!c.awaitingReply && <Icon name="chevronRight" size={16} style={{ color: 'var(--text-3)' }} />}
+                    <Icon name="chevronRight" size={16} style={{ color: 'var(--text-3)' }} />
                   </div>
                 </button>
               )
