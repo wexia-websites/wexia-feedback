@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useFeedback } from '@/lib/feedback-context'
 import type { Note } from '@/lib/feedback-context'
+import { useCheckEmails } from '@/lib/useCheckEmails'
 import {
   Icon, CatBadge, StatusPill, Avatar,
   CATEGORIES, STATUSES, STATUS_ORDER, STATUS_ICON,
@@ -92,8 +93,7 @@ export default function FeedbackDetailPage() {
   const [replyDraft, setReplyDraft] = useState('')
   const [sendingReply, setSendingReply] = useState(false)
   const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [checkingEmails, setCheckingEmails] = useState(false)
-  const [checkResult, setCheckResult] = useState<string | null>(null)
+  const { checkEmails: handleCheckEmails, checkingEmails, checkResult } = useCheckEmails()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState<'status' | 'emails' | 'notes'>(
     tabParam === 'emails' ? 'emails' : tabParam === 'notes' ? 'notes' : 'status'
@@ -143,26 +143,6 @@ export default function FeedbackDetailPage() {
       setReplyResult({ ok: false, msg: 'Síťová chyba. Zkus to znovu.' })
     }
     setSendingReply(false)
-  }
-
-  async function handleCheckEmails() {
-    setCheckingEmails(true)
-    setCheckResult(null)
-    try {
-      const res = await fetch('/api/check-emails', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok || json.error) {
-        setCheckResult(`Chyba: ${json.error ?? 'Neznámá chyba'}`)
-      } else {
-        setCheckResult(json.processed > 0
-          ? `Načteno ${json.processed} nových odpovědí.`
-          : 'Žádné nové odpovědi.')
-        await refresh()
-      }
-    } catch {
-      setCheckResult('Síťová chyba.')
-    }
-    setCheckingEmails(false)
   }
 
   // Auto-polling každých 30 s když je aktivní záložka E-maily

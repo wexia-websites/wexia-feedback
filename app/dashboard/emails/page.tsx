@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFeedback } from '@/lib/feedback-context'
+import { useCheckEmails } from '@/lib/useCheckEmails'
 import { Icon, CatBadge, Avatar, timeAgo, deriveTitle, stripEmailQuote } from '@/lib/feedback-ui'
 import Dropdown from '@/components/Dropdown'
 
@@ -27,6 +28,13 @@ export default function EmailsPage() {
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [userFilter, setUserFilter] = useState('')
+  const { checkEmails, checkingEmails, checkResult } = useCheckEmails()
+
+  // Auto-polling každých 30 s dokud je stránka zobrazená
+  useEffect(() => {
+    const timer = setInterval(() => { checkEmails() }, 30_000)
+    return () => clearInterval(timer)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const entries = useMemo<EmailEntry[]>(() => {
     const list: EmailEntry[] = []
@@ -93,15 +101,30 @@ export default function EmailsPage() {
           <h1>E-maily</h1>
           <p>Historie odpovědí přes všechny feedbacky</p>
         </div>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 7,
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          color: 'var(--text-2)', padding: '7px 13px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-        }}>
-          <Icon name="mail" size={15} style={{ color: 'var(--text-3)' }} />
-          {filtered.length} zpráv
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            color: 'var(--text-2)', padding: '7px 13px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+          }}>
+            <Icon name="mail" size={15} style={{ color: 'var(--text-3)' }} />
+            {filtered.length} zpráv
+          </div>
+          <button
+            onClick={checkEmails}
+            disabled={checkingEmails}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 10, fontSize: 13, fontWeight: 700, color: 'var(--accent-hi)', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.6 : 1, transition: 'opacity 0.14s' }}
+          >
+            <Icon name="trend" size={14} />
+            {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
+          </button>
         </div>
       </div>
+      {checkResult && (
+        <div style={{ padding: '0 32px 10px', fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', fontStyle: 'italic' }}>
+          {checkResult}
+        </div>
+      )}
 
       <div className="page-body">
         {/* Filtry */}
