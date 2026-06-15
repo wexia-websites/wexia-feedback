@@ -46,10 +46,9 @@ export async function POST() {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2 })
 
-    // Najdi nepřečtené zprávy adresované na wexia.feedback+*
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: 'is:unread to:wexia.feedback+',
+      q: 'is:unread',
       maxResults: 50,
     })
 
