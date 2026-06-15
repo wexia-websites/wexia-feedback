@@ -73,8 +73,10 @@ export async function POST() {
       if (!match) continue
       const feedbackId = match[1]
 
-      // Tělo zprávy (plain text)
-      const body = extractPlainText(full.data.payload).trim()
+      // Tělo zprávy (plain text) — odřízni citaci původní zprávy
+      const rawBody = extractPlainText(full.data.payload)
+      const quoteMatch = /\n.*(napsal|wrote):\s*\n/i.exec(rawBody)
+      const body = (quoteMatch ? rawBody.slice(0, quoteMatch.index) : rawBody).trim()
       if (!body) continue
 
       // ISO datum z e-mailu (fallback na teď)
