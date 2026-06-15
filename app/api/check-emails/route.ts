@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
-import { stripEmailQuote } from '@/lib/feedback-ui'
+import { stripEmailQuote } from '@/lib/email-utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

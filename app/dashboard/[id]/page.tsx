@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useFeedback } from '@/lib/feedback-context'
@@ -164,6 +164,13 @@ export default function FeedbackDetailPage() {
     }
     setCheckingEmails(false)
   }
+
+  // Auto-polling každých 30 s když je aktivní záložka E-maily
+  useEffect(() => {
+    if (activeTab !== 'emails') return
+    const timer = setInterval(() => { handleCheckEmails() }, 30_000)
+    return () => clearInterval(timer)
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAddNote() {
     if (!noteDraft.trim()) return
