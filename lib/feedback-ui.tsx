@@ -179,11 +179,15 @@ export function Avatar({ email, size = 30 }: { email: string | null; size?: numb
 export function fmtDate(iso: string | null): string {
   if (!iso) return '—'
   const dt = new Date(iso)
-  const dd = String(dt.getDate()).padStart(2, '0')
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const hh = String(dt.getHours()).padStart(2, '0')
-  const mi = String(dt.getMinutes()).padStart(2, '0')
-  return `${dd}. ${mm}. ${dt.getFullYear()} · ${hh}:${mi}`
+  const date = dt.toLocaleDateString('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  })
+  const time = dt.toLocaleTimeString('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    hour: '2-digit', minute: '2-digit',
+  })
+  return `${date} · ${time}`
 }
 
 export function timeAgo(iso: string | null): string {

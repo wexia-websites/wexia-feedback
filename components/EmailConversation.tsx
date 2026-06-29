@@ -48,7 +48,7 @@ export default function EmailConversation({ reportId }: Props) {
         setReplyResult({ ok: false, msg: json.error ?? 'Chyba při odesílání.' })
       } else {
         const sentAt = new Date().toISOString()
-        setReplyResult({ ok: true, msg: `Odesláno ${new Date(sentAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` })
+        setReplyResult({ ok: true, msg: `Odesláno ${new Date(sentAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })}` })
         const note: Note = { author: 'Tým', at: sentAt, text: `${SENT_PREFIX}${replyDraft.trim()}` }
         await addNote(reportId, note)
         setReplyDraft('')
