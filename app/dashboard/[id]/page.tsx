@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useFeedback } from '@/lib/feedback-context'
 import type { Note } from '@/lib/feedback-context'
-import { useCheckEmails } from '@/lib/useCheckEmails'
 import {
   Icon, CatBadge, StatusPill, Avatar,
   CATEGORIES, STATUSES, STATUS_ORDER, STATUS_ICON,
-  fmtDate, timeAgo, deriveTitle, stripEmailQuote,
+  fmtDate, timeAgo, deriveTitle,
   type CategoryId, type StatusId,
 } from '@/lib/feedback-ui'
+import EmailConversation from '@/components/EmailConversation'
 
 function ElementPreview({ selector, html }: { selector: string | null; html: string | null }) {
   const [copied, setCopied] = useState(false)
@@ -84,16 +84,12 @@ export default function FeedbackDetailPage() {
   const searchParams = useSearchParams()
   const id = params.id as string
 
-  const { reports, loading, updateStatus, addNote, refresh } = useFeedback()
+  const { reports, loading, updateStatus, addNote } = useFeedback()
 
   const [updating, setUpdating] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [addingNote, setAddingNote] = useState(false)
-  const [replyDraft, setReplyDraft] = useState('')
-  const [sendingReply, setSendingReply] = useState(false)
-  const [replyResult, setReplyResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const { checkEmails: handleCheckEmails, checkingEmails, checkResult } = useCheckEmails()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState<'status' | 'emails' | 'notes'>(
     tabParam === 'emails' ? 'emails' : tabParam === 'notes' ? 'notes' : 'status'
@@ -114,43 +110,6 @@ export default function FeedbackDetailPage() {
     setTimeout(() => setSuccessMsg(''), 3000)
     setUpdating(false)
   }
-
-  async function handleSendReply() {
-    if (!replyDraft.trim()) return
-    setSendingReply(true)
-    setReplyResult(null)
-    try {
-      const res = await fetch('/api/send-reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedbackId: id, replyText: replyDraft.trim() }),
-      })
-      const json = await res.json()
-      if (!res.ok || json.error) {
-        setReplyResult({ ok: false, msg: json.error ?? 'Chyba při odesílání.' })
-      } else {
-        const sentAt = new Date().toISOString()
-        setReplyResult({ ok: true, msg: `Odesláno ${new Date(sentAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` })
-        const note: Note = {
-          author: 'Tým',
-          at: sentAt,
-          text: `📧 Odpověď uživateli: ${replyDraft.trim()}`,
-        }
-        await addNote(id, note)
-        setReplyDraft('')
-      }
-    } catch {
-      setReplyResult({ ok: false, msg: 'Síťová chyba. Zkus to znovu.' })
-    }
-    setSendingReply(false)
-  }
-
-  // Auto-polling každých 30 s když je aktivní záložka E-maily
-  useEffect(() => {
-    if (activeTab !== 'emails') return
-    const timer = setInterval(() => { handleCheckEmails() }, 30_000)
-    return () => clearInterval(timer)
-  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAddNote() {
     if (!noteDraft.trim()) return
@@ -180,8 +139,7 @@ export default function FeedbackDetailPage() {
   const SENT_PREFIX = '📧 Odpověď uživateli: '
   const RECV_PREFIX = '📨 Odpověď od uživatele:\n'
   const allNotes: Note[] = item.notes ?? []
-  const emailNotes = allNotes.filter(n => n.text.startsWith(SENT_PREFIX) || n.text.startsWith(RECV_PREFIX))
-  const notes      = allNotes.filter(n => !n.text.startsWith(SENT_PREFIX) && !n.text.startsWith(RECV_PREFIX))
+  const notes = allNotes.filter(n => !n.text.startsWith(SENT_PREFIX) && !n.text.startsWith(RECV_PREFIX))
 
   return (
     <>
@@ -361,101 +319,7 @@ export default function FeedbackDetailPage() {
           )}
 
           {/* TAB: E-maily */}
-          {activeTab === 'emails' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-              {/* Hlavička + tlačítko zkontrolovat */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konverzace</div>
-                <button
-                  onClick={handleCheckEmails}
-                  disabled={checkingEmails}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--accent-hi)', background: 'none', border: 'none', cursor: checkingEmails ? 'default' : 'pointer', fontFamily: 'inherit', opacity: checkingEmails ? 0.5 : 1, padding: '2px 4px', borderRadius: 6 }}
-                  onMouseEnter={e => { if (!checkingEmails) e.currentTarget.style.background = 'var(--accent-soft)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-                >
-                  <Icon name="trend" size={13} />
-                  {checkingEmails ? 'Načítám…' : 'Zkontrolovat'}
-                </button>
-              </div>
-
-              {checkResult && (
-                <div style={{ fontSize: 12, color: checkResult.startsWith('Chyba') ? 'var(--accent-hi)' : 'var(--text-3)', fontStyle: 'italic' }}>
-                  {checkResult}
-                </div>
-              )}
-
-              {/* Chat bubliny — chronologicky */}
-              {emailNotes.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', textAlign: 'center', padding: '16px 0' }}>
-                  Zatím žádná komunikace.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[...emailNotes]
-                    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-                    .map((n, i) => {
-                      const isSent = n.text.startsWith(SENT_PREFIX)
-                      const rawText = isSent ? n.text.slice(SENT_PREFIX.length) : n.text.slice(RECV_PREFIX.length)
-                      const text = isSent ? rawText : stripEmailQuote(rawText)
-                      return (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isSent ? 'flex-end' : 'flex-start' }}>
-                          {/* Label */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
-                            {!isSent && item.user_email && <Avatar email={item.user_email} size={16} />}
-                            <span>{isSent ? 'Wexia Feedback' : (item.user_email ?? 'Uživatel')}</span>
-                          </div>
-                          {/* Bublina */}
-                          <div style={{
-                            maxWidth: '88%',
-                            background: isSent ? 'var(--accent-soft)' : 'var(--surface-2)',
-                            border: isSent ? '1px solid var(--accent-line)' : '1px solid var(--border)',
-                            borderRadius: isSent ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                            padding: '10px 13px',
-                          }}>
-                            <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text)', whiteSpace: 'pre-wrap', margin: 0, wordBreak: 'break-word' }}>{text}</p>
-                          </div>
-                          {/* Čas */}
-                          <span style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3, fontWeight: 500 }}>{timeAgo(n.at)}</span>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              {/* Odpovědět uživateli */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, boxShadow: 'var(--shadow)', marginTop: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 13 }}>Odpovědět</div>
-                {item.user_email ? (
-                  <>
-                    {replyResult && (
-                      <div className={replyResult.ok ? 'success-banner' : 'error-banner'} style={{ marginBottom: 10 }}>
-                        {replyResult.ok ? `✓ ${replyResult.msg}` : `✕ ${replyResult.msg}`}
-                      </div>
-                    )}
-                    <textarea
-                      value={replyDraft}
-                      onChange={e => { setReplyDraft(e.target.value); setReplyResult(null) }}
-                      placeholder="Napiš odpověď uživateli…"
-                      style={{ width: '100%', minHeight: 80, resize: 'vertical', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '11px 13px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 13.5, lineHeight: 1.5, outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s' }}
-                      onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)' }}
-                      onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
-                    />
-                    <button onClick={handleSendReply} disabled={!replyDraft.trim() || sendingReply}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: 11, borderRadius: 10, fontSize: 13.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.14s, opacity 0.14s', opacity: !replyDraft.trim() || sendingReply ? 0.45 : 1 }}
-                      onMouseEnter={e => { if (replyDraft.trim() && !sendingReply) e.currentTarget.style.background = 'var(--accent-hi)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)' }}>
-                      <Icon name="mail" size={15} />
-                      {sendingReply ? 'Odesílám…' : 'Odeslat e-mail'}
-                    </button>
-                  </>
-                ) : (
-                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>Feedback neobsahuje e-mail uživatele.</div>
-                )}
-              </div>
-
-            </div>
-          )}
+          {activeTab === 'emails' && <EmailConversation reportId={id} />}
 
           {/* TAB: Poznámky */}
           {activeTab === 'notes' && (
