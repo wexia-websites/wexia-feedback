@@ -59,11 +59,14 @@ export async function POST(req: NextRequest) {
 
     if (screenshot_base64) {
       const buffer = Buffer.from(screenshot_base64, 'base64')
-      const fileName = `${source_app}_${Date.now()}.png`
+      const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8
+      const ext = isJpeg ? 'jpg' : 'png'
+      const contentType = isJpeg ? 'image/jpeg' : 'image/png'
+      const fileName = `${source_app}_${Date.now()}.${ext}`
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('feedback-screenshots')
-        .upload(fileName, buffer, { contentType: 'image/png' })
+        .upload(fileName, buffer, { contentType })
 
       if (!uploadError && uploadData) {
         const { data: urlData } = supabase.storage
